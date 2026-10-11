@@ -28,8 +28,8 @@ export default function RecentTransactionsCard() {
           <FileClock className="h-4 w-4 text-text-secondary" />
           <h3 className="text-sm font-semibold text-text-primary">Recent Transactions</h3>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg bg-background p-0.5 text-xs font-medium">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex flex-wrap rounded-lg bg-background p-0.5 text-xs font-medium">
             {transactionTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -58,11 +58,39 @@ export default function RecentTransactionsCard() {
         <input
           type="text"
           placeholder="Search transaction..."
-          className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-3 text-xs text-text-primary outline-none placeholder:text-text-secondary"
+          aria-label="Search transactions"
+          className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-3 text-xs text-text-primary outline-none placeholder:text-text-secondary focus:border-primary-400"
         />
       </div>
 
-      <div className="overflow-x-auto">
+      <ul className="flex flex-col divide-y divide-border md:hidden">
+        {recentTransactions.map((tx) => {
+          const type = typeConfig[tx.type];
+          const TypeIcon = type.icon;
+          return (
+            <li key={tx.id} className="flex flex-col gap-1 py-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`flex items-center gap-1.5 font-medium ${type.color}`}>
+                  <TypeIcon className="h-3.5 w-3.5" />
+                  {tx.type}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusConfig[tx.status]}`}>
+                  {tx.status}
+                </span>
+              </div>
+              <p className="font-medium text-text-primary">
+                {tx.item} · {tx.quantity}
+              </p>
+              <p className="text-text-secondary">
+                {tx.reference} · {tx.location}
+              </p>
+              <p className="text-text-secondary">{tx.date}</p>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="text-xs font-medium text-text-secondary">

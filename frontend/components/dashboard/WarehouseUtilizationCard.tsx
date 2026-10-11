@@ -15,7 +15,7 @@ export default function WarehouseUtilizationCard() {
         </button>
       </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
         <div className="relative h-24 w-24 shrink-0">
           <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
             <circle cx="50" cy="50" r="40" fill="none" stroke="#dce6f2" strokeWidth="10" />
@@ -37,7 +37,7 @@ export default function WarehouseUtilizationCard() {
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col gap-2 text-xs">
+        <div className="flex w-full flex-1 flex-col gap-2 text-xs">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-text-secondary">
               <span className="h-2 w-2 rounded-full bg-primary-600" /> Used Space

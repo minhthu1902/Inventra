@@ -21,18 +21,18 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-        <div className="flex flex-col gap-5 xl:col-span-2">
+        <div className="flex min-w-0 flex-col gap-5 xl:col-span-2">
           <InventoryTrendCard />
           <RecentTransactionsCard />
         </div>
-        <div className="flex flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5">
           <AIInsightCard />
           <AlertsCard />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2">
+        <div className="min-w-0 xl:col-span-2">
           <QuickActionsCard />
         </div>
         <WarehouseUtilizationCard />

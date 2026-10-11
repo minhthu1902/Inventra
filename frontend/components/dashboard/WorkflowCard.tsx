@@ -24,9 +24,11 @@ export default function WorkflowCard() {
       <h3 className="mb-4 text-sm font-semibold text-text-primary">Warehouse Operations Workflow</h3>
       <div className="flex flex-wrap items-center gap-2">
         {workflowSteps.map((step, index) => (
-          <div key={step.id} className="flex items-center gap-2">
+          <div key={step.id} className="flex w-full items-center gap-2 sm:w-auto">
             <WorkflowStepItem step={step} />
-            {index < workflowSteps.length - 1 && <ArrowRight className="h-4 w-4 shrink-0 text-text-secondary" />}
+            {index < workflowSteps.length - 1 && (
+              <ArrowRight className="hidden h-4 w-4 shrink-0 text-text-secondary sm:block" />
+            )}
           </div>
         ))}
       </div>
@@ -37,7 +39,7 @@ export default function WorkflowCard() {
 function WorkflowStepItem({ step }: { step: WorkflowStep }) {
   const Icon = iconMap[step.icon];
   return (
-    <div className="flex min-w-[160px] flex-1 items-center gap-3 rounded-lg border border-border p-3">
+    <div className="flex min-w-0 flex-1 items-center gap-3 rounded-lg border border-border p-3 sm:min-w-[160px]">
       <span className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${toneMap[step.tone]}`}>
         <Icon className="h-4 w-4" />
         <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary-900 text-[9px] font-semibold text-white">
