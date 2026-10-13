@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { AlertTriangle, AlertCircle, Info, ChevronRight } from "lucide-react";
 import { alerts } from "@/utils/dashboardData";

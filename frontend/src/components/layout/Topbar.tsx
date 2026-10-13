@@ -1,5 +1,3 @@
-"use client";
-
 import { Search, Bell, ChevronDown, Warehouse, LogOut, Menu } from "lucide-react";
 import { signOut } from "@/utils/AuthApi.js";
 

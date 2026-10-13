@@ -1,11 +1,11 @@
 // Wraps the OpenAI Chat Completions API used by the AI Inventory Investigator.
-// Requires NEXT_PUBLIC_OPENAI_API_KEY to be set in .env.local.
+// Requires VITE_OPENAI_API_KEY in frontend/.env.local; move behind backend before production use.
 
 const BASE_URL = "https://api.openai.com/v1";
 const MODEL = "gpt-4o-mini";
 
 function getApiKey() {
-  return process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  return import.meta.env.VITE_OPENAI_API_KEY;
 }
 
 function checkResponse(res) {

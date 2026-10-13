@@ -1,8 +1,6 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useLocation, useNavigate } from "react-router-dom";
 import { LoaderCircle } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
@@ -10,17 +8,12 @@ import type { AccountUser } from "@/components/layout/Topbar";
 import { getCurrentUser } from "@/utils/AuthApi.js";
 
 export default function AppFrame({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const isAuthRoute = pathname.startsWith("/auth");
+  const location = useLocation();
+  const navigate = useNavigate();
   const [user, setUser] = useState<AccountUser | null>(null);
   const [isNavOpen, setIsNavOpen] = useState(false);
 
   useEffect(() => {
-    if (isAuthRoute) {
-      return;
-    }
-
     let active = true;
     const verifySession = () => {
       getCurrentUser()
@@ -30,7 +23,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
         .catch(() => {
           if (!active) return;
           setUser(null);
-          router.replace("/auth");
+          navigate("/auth", { replace: true });
         });
     };
 
@@ -40,11 +33,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
       active = false;
       window.removeEventListener("inventra:auth-change", verifySession);
     };
-  }, [isAuthRoute, router]);
-
-  if (isAuthRoute) {
-    return <main className="min-h-screen">{children}</main>;
-  }
+  }, [location.key, navigate]);
 
   if (!user) {
     return (

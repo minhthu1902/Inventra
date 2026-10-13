@@ -1,5 +1,3 @@
-"use client";
-
 import { Sparkles, ArrowRight, AlertCircle } from "lucide-react";
 import { aiInsights } from "@/utils/dashboardData";
 

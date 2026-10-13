@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect } from "react";
-import Link from "next/link";
+import { Link, useLocation } from "react-router-dom";
 import {
   X,
   LayoutDashboard,
@@ -62,14 +60,14 @@ const navSections: NavSection[] = [
   },
 ];
 
-const activeHref = "/";
-
 type SidebarProps = {
   isOpen: boolean;
   onClose: () => void;
 };
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { pathname } = useLocation();
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -113,7 +111,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <ul className="space-y-1">
                 {section.items.map((item) => (
                   <li key={item.href}>
-                    <NavEntry item={item} isActive={item.href === activeHref} onNavigate={onClose} />
+                    <NavEntry item={item} isActive={item.href === pathname} onNavigate={onClose} />
                   </li>
                 ))}
               </ul>
@@ -161,7 +159,7 @@ function NavEntry({ item, isActive, onNavigate }: { item: NavItem; isActive: boo
 
   return (
     <Link
-      href={item.href}
+      to={item.href}
       onClick={onNavigate}
       aria-current={isActive ? "page" : undefined}
       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${

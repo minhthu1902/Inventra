@@ -1,8 +1,5 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useNavigate } from "react-router-dom";
 import { BadgeCheck, CircleAlert, LoaderCircle } from "lucide-react";
 import Logo from "@/components/shared/Logo";
 import { verifyEmail } from "@/utils/AuthApi.js";
@@ -10,7 +7,7 @@ import { verifyEmail } from "@/utils/AuthApi.js";
 type VerificationState = "loading" | "success" | "error";
 
 export default function VerifyEmailPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const verificationStarted = useRef(false);
   const [state, setState] = useState<VerificationState>("loading");
   const [message, setMessage] = useState("Verifying your email...");
@@ -29,7 +26,7 @@ export default function VerifyEmailPage() {
     verification
       .then((result) => {
         setState("success");
-        setMessage(result.message);
+        setMessage(result.message ?? "Email verification completed.");
       })
       .catch((error: unknown) => {
         setState("error");
@@ -60,14 +57,14 @@ export default function VerifyEmailPage() {
           {state === "success" && (
             <button
               type="button"
-              onClick={() => router.replace("/auth")}
+              onClick={() => navigate("/auth", { replace: true })}
               className="mt-6 w-full rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700"
             >
               Continue to sign in
             </button>
           )}
           {state === "error" && (
-            <Link href="/auth" className="mt-6 inline-block text-sm font-semibold text-primary-700 underline">
+            <Link to="/auth" className="mt-6 inline-block text-sm font-semibold text-primary-700 underline">
               Return to sign in
             </Link>
           )}

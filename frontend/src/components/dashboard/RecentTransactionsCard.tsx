@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { FileClock, Search, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, Repeat, SlidersHorizontal } from "lucide-react";
 import { recentTransactions, transactionTabs } from "@/utils/dashboardData";

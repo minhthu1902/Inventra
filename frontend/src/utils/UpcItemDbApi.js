@@ -1,6 +1,5 @@
 // Wraps the UPCItemDB product lookup API used to auto-fill item details from a barcode/SKU.
-// The public "trial" endpoint is free but rate-limited; set NEXT_PUBLIC_UPCITEMDB_API_KEY
-// and switch BASE_URL to the paid endpoint for production use.
+// The trial endpoint is rate-limited; switch BASE_URL to the paid endpoint for production use.
 
 const BASE_URL = "https://api.upcitemdb.com/prod/trial";
 
@@ -9,7 +8,9 @@ function checkResponse(res) {
     return res.json();
   }
   return res.json().then((error) => {
-    throw new Error(error?.message || `Request failed with status ${res.status}`);
+    throw new Error(
+      error?.message || `Request failed with status ${res.status}`,
+    );
   });
 }
 
@@ -32,7 +33,9 @@ export function lookupProductByBarcode(barcode) {
     },
   })
     .then(checkResponse)
-    .then((data) => (data.items && data.items.length > 0 ? normalizeItem(data.items[0]) : null));
+    .then((data) =>
+      data.items && data.items.length > 0 ? normalizeItem(data.items[0]) : null,
+    );
 }
 
 // Searches products by free-text name and returns a normalized item list.

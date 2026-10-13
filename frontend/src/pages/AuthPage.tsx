@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, LoaderCircle, MailCheck } from "lucide-react";
 import Logo from "@/components/shared/Logo";
 import { resendVerification, signIn, signUp } from "@/utils/AuthApi.js";
@@ -9,7 +7,7 @@ import { resendVerification, signIn, signUp } from "@/utils/AuthApi.js";
 type AuthMode = "signin" | "signup";
 
 export default function AuthPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<AuthMode>("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -31,7 +29,7 @@ export default function AuthPage() {
     try {
       if (mode === "signup") {
         const result = await signUp({ name, email, password });
-        setNotice(result.message);
+        setNotice(result.message ?? "Account created. Check your email for a verification link.");
         setVerificationUrl(result.verificationUrl || "");
         setCanResend(true);
         setPassword("");
@@ -39,8 +37,7 @@ export default function AuthPage() {
       } else {
         await signIn({ email, password });
       }
-      router.replace("/");
-      router.refresh();
+      navigate("/", { replace: true });
     } catch (requestError) {
       const apiError = requestError as Error & { code?: string };
       setError(apiError instanceof Error ? apiError.message : "Unable to authenticate.");
@@ -67,7 +64,7 @@ export default function AuthPage() {
     setIsSubmitting(true);
     try {
       const result = await resendVerification(email);
-      setNotice(result.message);
+      setNotice(result.message ?? "If the account needs verification, a new link will be sent.");
       setVerificationUrl(result.verificationUrl || "");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to resend verification email.");

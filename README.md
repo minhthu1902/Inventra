@@ -6,18 +6,19 @@ Inventra is a warehouse and inventory operations dashboard being developed for t
 
 The current release is an early application foundation:
 
-- The Next.js dashboard is populated with sample data from `frontend/utils/dashboardData.ts`.
+- The Vite + React dashboard is populated with sample data from `frontend/src/utils/dashboardData.ts`.
 - The Express backend provides account registration, sign-in, email verification, session, and health-check endpoints backed by MongoDB.
 - Product lookup, currency conversion, and AI request utilities exist in the frontend source, but are not yet connected to dashboard workflows. They should be treated as integration scaffolding, not live dashboard features.
-- The frontend and backend are designed to run locally together. A remote deployment is not included in this repository setup.
+- The frontend and backend are designed to run locally together. Deployment targets are Firebase Hosting for the static frontend and Cloud Run for the Express API; deploy only after supplying production database and secret configuration.
 
 ## Technology Choices
 
 | Technology | How Inventra uses it | Why it fits |
 | --- | --- | --- |
-| JavaScript and TypeScript | JavaScript is used for backend modules and API utilities; TypeScript/TSX is used for the Next.js interface. | JavaScript supports the Node.js API and browser `fetch` utilities. TypeScript adds checks for React components and dashboard data shapes. |
+| JavaScript and TypeScript | JavaScript is used for backend modules and API utilities; TypeScript/TSX is used for the React interface. | JavaScript supports the Node.js API and browser `fetch` utilities. TypeScript adds checks for React components and dashboard data shapes. |
 | React 19 | Builds the dashboard, shared layout, authentication screens, and reusable UI components. | Component-based UI makes repeated dashboard sections easier to develop and maintain. |
-| Next.js 16 App Router | Serves the frontend routes and proxies `/api/*` requests to the Express server in development. | Provides the React application framework, route structure, and production build tooling already used by this project. |
+| Vite 7 | Develops and builds the frontend; its dev-server proxy forwards `/api/*` to Express. | Fast local startup and a small static production bundle, suitable for Firebase Hosting. |
+| React Router 7 | Defines dashboard, authentication, and email-verification routes. | Client-side navigation gives the single-page React app explicit routes without a server-rendering framework. |
 | Tailwind CSS 4 | Styles the dashboard and shared UI with utility classes and project theme tokens. | Keeps styling close to the component markup and supports consistent design tokens. |
 | Node.js 22 and Express 5 | Runs the backend HTTP API. | Node.js uses the same JavaScript ecosystem as the frontend; Express provides a small, direct route and middleware layer. |
 | MongoDB and Mongoose 8 | Stores user accounts; Mongoose defines and accesses the current user model. | MongoDB provides document storage and Mongoose adds schema validation and model APIs for the Node backend. |
@@ -29,7 +30,7 @@ The current release is an early application foundation:
 
 ### Inventra backend API
 
-The backend runs on port `4000` by default. In local development, Next.js rewrites requests under `/api/*` to this server. Available routes are:
+The backend runs on port `4000` by default. In local development, Vite proxies requests under `/api/*` to this server. Firebase Hosting uses a same-origin rewrite to the Cloud Run API in production. Available routes are:
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -41,7 +42,7 @@ The backend runs on port `4000` by default. In local development, Next.js rewrit
 | `POST` | `/api/auth/signout` | Clears the session cookie. |
 | `GET` | `/api/auth/me` | Returns the signed-in user; requires a valid session. |
 
-Authentication requests are implemented in `frontend/utils/AuthApi.js` and call the backend through the same-origin `/api/auth` path. This backend API is active application functionality, but it does not yet provide inventory product, stock, receiving, or shipment data.
+Authentication requests are implemented in `frontend/src/utils/AuthApi.ts` and call the backend through the same-origin `/api/auth` path. This backend API is active application functionality, but it does not yet provide inventory product, stock, receiving, or shipment data.
 
 ### Third-party API utilities
 
@@ -53,7 +54,7 @@ These integrations are present as request wrappers, but no current dashboard com
 | exchangerate.host | `https://api.exchangerate.host/latest` for rates and `/convert` for currency conversion. | Utility only; not wired into supplier or purchasing screens. Availability and access requirements depend on the provider. |
 | OpenAI API | Chat Completions endpoint `https://api.openai.com/v1/chat/completions`, configured with model `gpt-4o-mini` for the planned AI Inventory Investigator. | Utility only; not wired into the dashboard interaction. No AI answer is currently generated from live inventory data. |
 
-**OpenAI key security:** the current `OpenAiApi.js` reads `NEXT_PUBLIC_OPENAI_API_KEY`, which would expose a key to browser-side code if configured. Do not put a production API key in a `NEXT_PUBLIC_*` variable. Before enabling this integration, proxy OpenAI requests through the backend and keep the secret in a server-only environment variable.
+**OpenAI key security:** the current `OpenAiApi.js` reads `VITE_OPENAI_API_KEY`, which is bundled into browser-side code by Vite if configured. Do not put a production API key in a `VITE_*` variable. Before enabling this integration, proxy OpenAI requests through the backend and keep the secret in a server-only environment variable.
 
 AI-related dashboard insight cards currently render sample content. They do not represent responses generated by the OpenAI API.
 
@@ -70,10 +71,13 @@ Inventra/
 │   │   └── models/        # Mongoose models
 │   └── tests/             # Node.js test-runner tests
 └── frontend/
-    ├── app/               # Next.js App Router pages and global styles
-    ├── components/        # Dashboard, layout, and shared React components
+    ├── src/
+    │   ├── pages/         # Dashboard and authentication route pages
+    │   ├── components/    # Dashboard, layout, and shared React components
+    │   └── utils/         # Auth client and third-party API wrappers
     ├── public/            # Static assets
-    └── utils/             # Auth client and third-party API wrappers
+    ├── index.html         # Vite HTML entry point
+    └── vite.config.ts     # Vite, Tailwind, React and API proxy configuration
 ```
 
 ## Run Locally
@@ -102,7 +106,7 @@ cd frontend
 npm run dev:full
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The frontend is served on port `3000`; Next.js proxies `/api/*` to the backend on port `4000`. To run only the frontend, use `npm run dev` from `frontend/` and start the backend separately with `npm --prefix backend run dev` from the repository root.
+Open [http://localhost:5173](http://localhost:5173). Vite serves the frontend and proxies `/api/*` to the backend on port `4000`. To run only the frontend, use `npm run dev` from `frontend/` and start the backend separately with `npm --prefix backend run dev` from the repository root.
 
 ## Validation
 
@@ -121,4 +125,34 @@ npm --prefix backend test
 
 ## Next Steps
 
-The next inventory milestones are to add product, warehouse/location, lot and stock-movement models; expose inventory endpoints; connect dashboard and transaction views to persisted API data; complete responsive behavior down to 320px; and deploy the frontend for review.
+The next inventory milestones are to add product, warehouse/location, lot and stock-movement models; expose inventory endpoints; connect dashboard and transaction views to persisted API data; and deploy the frontend and backend to the configured Google Cloud targets.
+
+## Google Cloud Deployment
+
+The deployment setup uses Firebase Hosting for the static Vite build and Cloud Run for the Express API. No project Dockerfile is required: Cloud Run's `--source` deployment uses Google Cloud Buildpacks. Firebase Hosting rewrites `/api/**` to the Cloud Run service so browser authentication requests remain same-origin.
+
+Deployment is configured but not yet published. Before deploying, confirm that the Google Cloud project has billing enabled and Cloud Build, Artifact Registry, Cloud Run, and Firebase Hosting are available. You also need a production MongoDB URI reachable from Cloud Run, a strong JWT secret stored in Secret Manager, and Firebase CLI authentication. Never commit database credentials or a JWT secret.
+
+Create `inventra-mongodb-uri` and `inventra-jwt-secret` in Secret Manager and grant the Cloud Run runtime service account access to them. Then deploy the API from the repository root:
+
+```sh
+gcloud config set project wtwr-project-493900
+gcloud run deploy inventra-api \
+    --source backend \
+    --region us-central1 \
+    --allow-unauthenticated \
+    --set-env-vars NODE_ENV=production,FRONTEND_ORIGIN=https://wtwr-project-493900.web.app \
+    --set-secrets MONGODB_URI=inventra-mongodb-uri:latest,JWT_SECRET=inventra-jwt-secret:latest
+```
+
+Build and deploy the frontend after the API is ready:
+
+```sh
+cd frontend
+npm run build
+cd ..
+npx firebase-tools use wtwr-project-493900
+npx firebase-tools deploy --only hosting
+```
+
+After deployment, open the Firebase Hosting URL and verify sign-in, sign-out, email verification, protected dashboard access, and `/api/health`. Add the confirmed live URL to this README and the review PR. The dashboard inventory cards currently use sample data; deploying does not make those values live.
