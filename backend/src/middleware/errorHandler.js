@@ -3,6 +3,11 @@ export function notFoundHandler(_request, response) {
 }
 
 export function errorHandler(error, _request, response, _next) {
+  if (error.code === 11000) {
+    return response
+      .status(409)
+      .json({ message: "A record with this identifier already exists" });
+  }
   const status =
     Number.isInteger(error.status) && error.status >= 400 && error.status < 500
       ? error.status

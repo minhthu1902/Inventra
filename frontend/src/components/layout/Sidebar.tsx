@@ -34,7 +34,7 @@ const navSections: NavSection[] = [
   {
     title: "Inventory",
     items: [
-      { label: "Inventory", href: "/inventory", icon: PackageSearch },
+      { label: "Inventory", href: "/inventory", icon: PackageSearch, isAvailable: true },
       { label: "Inbound", href: "/inbound", icon: ArrowDownToLine },
       { label: "Outbound", href: "/outbound", icon: ArrowUpFromLine },
       { label: "Transfers", href: "/transfers", icon: Repeat },

@@ -4,6 +4,8 @@ import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env.js";
 import authRoutes from "./auth/authRoutes.js";
+import inventoryRoutes from "./inventory/inventoryRoutes.js";
+import dashboardRoutes from "./dashboard/dashboardRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 export const app = express();
@@ -23,5 +25,7 @@ app.get("/api/health", (_request, response) => {
   response.status(200).json({ status: "ok" });
 });
 app.use("/api/auth", authRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);

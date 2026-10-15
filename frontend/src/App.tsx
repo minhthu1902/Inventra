@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppFrame from "@/components/layout/AppFrame";
 import AuthPage from "@/pages/AuthPage";
 import DashboardPage from "@/pages/DashboardPage";
+import InventoryPage from "@/pages/InventoryPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 
 export default function App() {
@@ -10,6 +11,14 @@ export default function App() {
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
+        <Route
+          path="/inventory"
+          element={
+            <AppFrame>
+              <InventoryPage />
+            </AppFrame>
+          }
+        />
         <Route
           path="/"
           element={

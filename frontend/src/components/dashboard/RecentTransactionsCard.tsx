@@ -1,6 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FileClock, Search, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, Repeat, SlidersHorizontal } from "lucide-react";
-import { recentTransactions, transactionTabs } from "@/utils/dashboardData";
+
+export type RecentTransaction = {
+  id: string;
+  date: string;
+  type: "Inbound" | "Outbound" | "Transfer" | "Adjustment";
+  reference: string;
+  item: string;
+  quantity: string;
+  location: string;
+  status: "Received" | "Shipped" | "Transferred" | "Adjusted";
+};
+
+type RecentTransactionsCardProps = {
+  transactions: RecentTransaction[];
+};
 
 const typeConfig = {
   Inbound: { icon: ArrowDownToLine, color: "text-success" },
@@ -16,8 +30,23 @@ const statusConfig = {
   Adjusted: "bg-warning-bg text-warning",
 } as const;
 
-export default function RecentTransactionsCard() {
-  const [activeTab, setActiveTab] = useState(transactionTabs[0].id);
+export default function RecentTransactionsCard({ transactions }: RecentTransactionsCardProps) {
+  const [activeTab, setActiveTab] = useState("all");
+  const [search, setSearch] = useState("");
+  const transactionTabs = [
+    { id: "all", label: "All" },
+    { id: "inbound", label: "Inbound" },
+    { id: "outbound", label: "Outbound" },
+    { id: "transfer", label: "Transfer" },
+    { id: "adjustment", label: "Adjustment" },
+  ];
+  const visibleTransactions = useMemo(() => transactions.filter((transaction) => {
+    const matchesTab = activeTab === "all" || transaction.type.toLowerCase() === activeTab;
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query || [transaction.item, transaction.reference, transaction.location]
+      .some((value) => value.toLowerCase().includes(query));
+    return matchesTab && matchesSearch;
+  }), [activeTab, search, transactions]);
 
   return (
     <div className="flex flex-1 flex-col rounded-xl border border-border bg-surface p-5">
@@ -37,7 +66,7 @@ export default function RecentTransactionsCard() {
                   activeTab === tab.id ? "bg-primary-600 text-white hover:bg-primary-700" : "text-text-secondary hover:text-text-primary"
                 }`}
               >
-                {tab.label} ({tab.count})
+                {tab.label} ({tab.id === "all" ? transactions.length : transactions.filter((transaction) => transaction.type.toLowerCase() === tab.id).length})
               </button>
             ))}
           </div>
@@ -57,12 +86,14 @@ export default function RecentTransactionsCard() {
           type="text"
           placeholder="Search transaction..."
           aria-label="Search transactions"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
           className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-3 text-xs text-text-primary outline-none placeholder:text-text-secondary focus:border-primary-400"
         />
       </div>
 
       <ul className="flex flex-col divide-y divide-border md:hidden">
-        {recentTransactions.map((tx) => {
+        {visibleTransactions.map((tx) => {
           const type = typeConfig[tx.type];
           const TypeIcon = type.icon;
           return (
@@ -86,6 +117,9 @@ export default function RecentTransactionsCard() {
             </li>
           );
         })}
+        {visibleTransactions.length === 0 && (
+          <li key="empty-transactions" className="py-6 text-center text-sm text-text-secondary">No transactions match this filter.</li>
+        )}
       </ul>
 
       <div className="hidden overflow-x-auto md:block">
@@ -103,7 +137,7 @@ export default function RecentTransactionsCard() {
             </tr>
           </thead>
           <tbody>
-            {recentTransactions.map((tx) => {
+            {visibleTransactions.map((tx) => {
               const type = typeConfig[tx.type];
               const TypeIcon = type.icon;
               return (

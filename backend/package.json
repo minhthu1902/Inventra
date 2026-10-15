@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "seed:inventory": "node src/scripts/seedInventory.js",
     "test": "node --test"
   },
   "dependencies": {

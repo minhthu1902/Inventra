@@ -1,8 +1,12 @@
-import { useState } from "react";
-import { AlertTriangle, AlertCircle, Info, ChevronRight } from "lucide-react";
-import { alerts } from "@/utils/dashboardData";
+import { AlertTriangle, AlertCircle, Info } from "lucide-react";
 
-const tabs = ["Alerts (4)", "Recent Activity"];
+export type DashboardAlert = {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  description: string;
+  time: string;
+};
 
 const severityConfig = {
   critical: { icon: AlertCircle, dot: "bg-danger", bg: "bg-danger-bg", text: "text-danger" },
@@ -10,9 +14,7 @@ const severityConfig = {
   info: { icon: Info, dot: "bg-info", bg: "bg-info-bg", text: "text-info" },
 } as const;
 
-export default function AlertsCard() {
-  const [activeTab, setActiveTab] = useState(tabs[0]);
-
+export default function AlertsCard({ alerts }: { alerts: DashboardAlert[] }) {
   return (
     <div className="flex h-full flex-col rounded-xl border border-border bg-surface p-5">
       <div className="mb-3 flex items-center justify-between">
@@ -20,24 +22,7 @@ export default function AlertsCard() {
           <AlertTriangle className="h-4 w-4 text-danger" />
           <h3 className="text-sm font-semibold text-text-primary">Alerts &amp; Attention</h3>
         </div>
-        <button type="button" className="flex items-center text-xs font-medium text-primary-600 hover:underline">
-          View all <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div className="mb-3 flex gap-1 border-b border-border text-sm">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`-mb-px border-b-2 px-2 pb-2 text-sm font-medium transition-colors ${
-              activeTab === tab ? "border-danger text-danger" : "border-transparent text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+        <span className="text-xs text-text-secondary">{alerts.length} active</span>
       </div>
 
       <ul className="flex flex-col gap-2">
@@ -55,6 +40,9 @@ export default function AlertsCard() {
             </li>
           );
         })}
+        {alerts.length === 0 && (
+          <li key="empty-low-stock-alerts" className="py-6 text-center text-sm text-text-secondary">No low-stock alerts right now.</li>
+        )}
       </ul>
     </div>
   );

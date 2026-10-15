@@ -4,10 +4,11 @@ Inventra is a warehouse and inventory operations dashboard being developed for t
 
 ## Project Status
 
-The current release is an early application foundation:
+The current release is an early inventory application foundation:
 
-- The Vite + React dashboard is populated with sample data from `frontend/src/utils/dashboardData.ts`.
-- The Express backend provides account registration, sign-in, email verification, session, and health-check endpoints backed by MongoDB.
+- The Vite + React dashboard reads its inventory KPIs, movement trend, low-stock alerts, recent transactions and warehouse utilization from the authenticated Express API.
+- The Express backend provides account registration, sign-in, email verification, session, inventory, transaction and dashboard endpoints backed by MongoDB.
+- The repeatable seed creates explicitly synthetic retail demo data. It is not HEB or Walmart operational data.
 - Product lookup, currency conversion, and AI request utilities exist in the frontend source, but are not yet connected to dashboard workflows. They should be treated as integration scaffolding, not live dashboard features.
 - The frontend and backend are designed to run locally together. Deployment targets are Firebase Hosting for the static frontend and Cloud Run for the Express API; deploy only after supplying production database and secret configuration.
 
@@ -42,7 +43,26 @@ The backend runs on port `4000` by default. In local development, Vite proxies r
 | `POST` | `/api/auth/signout` | Clears the session cookie. |
 | `GET` | `/api/auth/me` | Returns the signed-in user; requires a valid session. |
 
-Authentication requests are implemented in `frontend/src/utils/AuthApi.ts` and call the backend through the same-origin `/api/auth` path. This backend API is active application functionality, but it does not yet provide inventory product, stock, receiving, or shipment data.
+### Inventory and dashboard API
+
+Every endpoint below requires the HTTP-only session cookie. Records are scoped to the authenticated user's `ownerId`; a user cannot list or mutate another user's inventory by supplying their IDs.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` / `POST` | `/api/inventory/warehouses` | List or create the current user's warehouses. |
+| `GET` | `/api/inventory/warehouses/:warehouseId/locations` | List locations only when the warehouse belongs to the current user. |
+| `POST` | `/api/inventory/locations` | Create a location under one of the current user's warehouses. |
+| `GET` / `POST` | `/api/inventory` | Search/filter/page inventory or create an item. Query filters include `search`, `category`, `warehouseId`, and `stockStatus`. |
+| `GET` / `PATCH` | `/api/inventory/:itemId` | Read or update an owned item. SKU, warehouse/location and stock quantity cannot be changed through the metadata update endpoint. |
+| `POST` | `/api/inventory/:itemId/transactions` | Record `inbound`, `outbound`, or `adjustment` (`direction: increase|decrease`). Outbound/decrease movements cannot reduce stock below zero. |
+| `GET` | `/api/inventory/transactions` | List the current user's movement ledger with optional `type` and `inventoryItemId` filters and pagination. |
+| `GET` | `/api/dashboard/summary` | Return SKU/unit totals, low/out-of-stock counts, today's inbound/outbound totals, alerts and recent transactions. |
+| `GET` | `/api/dashboard/trend?days=7` | Return database-derived daily stock/inbound/outbound series for 7–90 days. |
+| `GET` | `/api/dashboard/warehouse-utilization` | Return used units, capacity and utilization per owned warehouse. |
+
+Inventory models are `InventoryItem`, `Warehouse`, `Location` and `Transaction`. Each has an `ownerId` reference to the existing `User`; item/location/transaction records also reference their parent records. Transactions are append-only through the API. The current implementation uses atomic stock updates and a compensating update if ledger creation fails, so it works on a standalone local MongoDB without requiring replica-set transactions.
+
+Authentication requests are implemented in `frontend/src/utils/AuthApi.ts`; inventory and dashboard requests are in `frontend/src/utils/InventoryApi.ts`. Vite proxies the same-origin `/api/*` requests to Express locally, and Firebase Hosting is configured to rewrite them to Cloud Run in production.
 
 ### Third-party API utilities
 
@@ -123,9 +143,19 @@ Run backend tests:
 npm --prefix backend test
 ```
 
+## Synthetic Demo Seed
+
+The seed requires an existing verified user. It replaces only that user's synthetic inventory items and transactions, and upserts warehouses/locations with reserved `DEMO-*` codes. Manually entered items, transactions, warehouses/locations with other codes, and all other users' data are left intact. Seed product names and quantities are invented retail examples; they must not be presented as real HEB/Walmart data.
+
+```sh
+SEED_USER_EMAIL=your-verified-email@example.com npm --prefix backend run seed:inventory
+```
+
+Running the command again produces the same set of demo warehouses, locations, products and movement history without adding duplicates.
+
 ## Next Steps
 
-The next inventory milestones are to add product, warehouse/location, lot and stock-movement models; expose inventory endpoints; connect dashboard and transaction views to persisted API data; and deploy the frontend and backend to the configured Google Cloud targets.
+Potential follow-up work includes importing a licensed subset of a public retail-sales dataset with attribution, richer receiving/shipping workflows, expiration alerts and deployment verification. The currently seeded inventory remains synthetic.
 
 ## Google Cloud Deployment
 
