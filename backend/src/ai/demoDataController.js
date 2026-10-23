@@ -158,7 +158,7 @@ export async function createInvestigatorDemoData(request, response) {
     return response.status(201).json({
       message: "Synthetic demo inventory was added. It is not real retailer data.",
       itemsCreated: items.length,
-      transactionsCreated: transactions.length,
+      transactionsCreated: transactionDocuments.length,
     });
   } catch (error) {
     if (created.transactionIds.length) {
