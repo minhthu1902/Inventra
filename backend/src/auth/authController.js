@@ -50,9 +50,18 @@ export async function signUp(request, response) {
           "Your account was created, but the verification email could not be sent. Configure email delivery or try resending.",
       });
     }
+    let message =
+      "Account created. Check your email for a verification link before signing in.";
+    if (delivery.demoMode) {
+      message =
+        "Demo mode: no email is sent. Use the verification link below to activate your account.";
+    } else if (delivery.verificationUrl) {
+      message =
+        "Account created. Use the verification link below to activate your account.";
+    }
+
     return response.status(201).json({
-      message:
-        "Account created. Check your email for a verification link before signing in.",
+      message,
       email: user.email,
       ...(delivery.verificationUrl
         ? { verificationUrl: delivery.verificationUrl }
@@ -143,9 +152,12 @@ export async function resendVerificationEmail(request, response) {
     });
   }
 
+  const message = delivery.demoMode
+    ? "Demo mode: no email is sent. Use the new verification link below to activate your account."
+    : "If an unverified account exists for that email, a new verification link will be sent.";
+
   return response.status(200).json({
-    message:
-      "If an unverified account exists for that email, a new verification link will be sent.",
+    message,
     ...(delivery.verificationUrl
       ? { verificationUrl: delivery.verificationUrl }
       : {}),
