@@ -2,6 +2,8 @@
 
 Inventra is a warehouse and inventory operations dashboard being developed for the HEB food-retail use case. It is intended to help users follow inventory levels, inbound and outbound activity, warehouse locations, and operational alerts. Food-specific capabilities such as lot and expiration tracking are planned; they are not yet implemented in the current backend.
 
+**Live demo:** [Open Inventra](https://35.239.213.104/)
+
 ## Project Status
 
 The current release is an early inventory application foundation:
@@ -10,7 +12,7 @@ The current release is an early inventory application foundation:
 - The Express backend provides account registration, sign-in, email verification, session, inventory, transaction and dashboard endpoints backed by MongoDB.
 - The repeatable seed creates explicitly synthetic retail demo data. It is not HEB or Walmart operational data.
 - Product lookup, currency conversion, and AI request utilities exist in the frontend source, but are not yet connected to dashboard workflows. They should be treated as integration scaffolding, not live dashboard features.
-- The frontend and backend are designed to run locally together. Deployment targets are Firebase Hosting for the static frontend and Cloud Run for the Express API; deploy only after supplying production database and secret configuration.
+- The frontend and backend run locally together. The reviewer deployment uses Nginx and Express on a Google Compute Engine VM, with MongoDB Atlas M0 for database storage.
 
 ## Technology Choices
 
@@ -18,7 +20,7 @@ The current release is an early inventory application foundation:
 | --- | --- | --- |
 | JavaScript and TypeScript | JavaScript is used for backend modules and API utilities; TypeScript/TSX is used for the React interface. | JavaScript supports the Node.js API and browser `fetch` utilities. TypeScript adds checks for React components and dashboard data shapes. |
 | React 19 | Builds the dashboard, shared layout, authentication screens, and reusable UI components. | Component-based UI makes repeated dashboard sections easier to develop and maintain. |
-| Vite 7 | Develops and builds the frontend; its dev-server proxy forwards `/api/*` to Express. | Fast local startup and a small static production bundle, suitable for Firebase Hosting. |
+| Vite 7 | Develops and builds the frontend; its dev-server proxy forwards `/api/*` to Express. | Fast local startup and a small static production bundle, served by Nginx on the Google Compute Engine VM. |
 | React Router 7 | Defines dashboard, authentication, and email-verification routes. | Client-side navigation gives the single-page React app explicit routes without a server-rendering framework. |
 | Tailwind CSS 4 | Styles the dashboard and shared UI with utility classes and project theme tokens. | Keeps styling close to the component markup and supports consistent design tokens. |
 | Node.js 22 and Express 5 | Runs the backend HTTP API. | Node.js uses the same JavaScript ecosystem as the frontend; Express provides a small, direct route and middleware layer. |
@@ -31,7 +33,7 @@ The current release is an early inventory application foundation:
 
 ### Inventra backend API
 
-The backend runs on port `4000` by default. In local development, Vite proxies requests under `/api/*` to this server. Firebase Hosting uses a same-origin rewrite to the Cloud Run API in production. Available routes are:
+The backend runs on port `4000` by default. In local development, Vite proxies requests under `/api/*` to this server. In the live VM deployment, Nginx serves the frontend and proxies same-origin `/api/*` requests to Express. Available routes are:
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -62,7 +64,7 @@ Every endpoint below requires the HTTP-only session cookie. Records are scoped t
 
 Inventory models are `InventoryItem`, `Warehouse`, `Location` and `Transaction`. Each has an `ownerId` reference to the existing `User`; item/location/transaction records also reference their parent records. Transactions are append-only through the API. The current implementation uses atomic stock updates and a compensating update if ledger creation fails, so it works on a standalone local MongoDB without requiring replica-set transactions.
 
-Authentication requests are implemented in `frontend/src/utils/AuthApi.ts`; inventory and dashboard requests are in `frontend/src/utils/InventoryApi.ts`. Vite proxies the same-origin `/api/*` requests to Express locally, and Firebase Hosting is configured to rewrite them to Cloud Run in production.
+Authentication requests are implemented in `frontend/src/utils/AuthApi.ts`; inventory and dashboard requests are in `frontend/src/utils/InventoryApi.ts`. Vite proxies same-origin `/api/*` requests to Express locally, and Nginx performs the same proxying in the live VM deployment.
 
 ### Third-party API utilities
 
@@ -157,32 +159,8 @@ Running the command again produces the same set of demo warehouses, locations, p
 
 Potential follow-up work includes importing a licensed subset of a public retail-sales dataset with attribution, richer receiving/shipping workflows, expiration alerts and deployment verification. The currently seeded inventory remains synthetic.
 
-## Google Cloud Deployment
+## Live Google Cloud Demo
 
-The deployment setup uses Firebase Hosting for the static Vite build and Cloud Run for the Express API. No project Dockerfile is required: Cloud Run's `--source` deployment uses Google Cloud Buildpacks. Firebase Hosting rewrites `/api/**` to the Cloud Run service so browser authentication requests remain same-origin.
+Open Inventra at [https://35.239.213.104](https://35.239.213.104/). The demo runs on a Google Compute Engine VM. Nginx serves the Vite frontend over HTTPS and proxies API requests to the Express backend; MongoDB Atlas M0 stores application data.
 
-Deployment is configured but not yet published. Before deploying, confirm that the Google Cloud project has billing enabled and Cloud Build, Artifact Registry, Cloud Run, and Firebase Hosting are available. You also need a production MongoDB URI reachable from Cloud Run, a strong JWT secret stored in Secret Manager, and Firebase CLI authentication. Never commit database credentials or a JWT secret.
-
-Create `inventra-mongodb-uri` and `inventra-jwt-secret` in Secret Manager and grant the Cloud Run runtime service account access to them. Then deploy the API from the repository root:
-
-```sh
-gcloud config set project wtwr-project-493900
-gcloud run deploy inventra-api \
-    --source backend \
-    --region us-central1 \
-    --allow-unauthenticated \
-    --set-env-vars NODE_ENV=production,FRONTEND_ORIGIN=https://wtwr-project-493900.web.app \
-    --set-secrets MONGODB_URI=inventra-mongodb-uri:latest,JWT_SECRET=inventra-jwt-secret:latest
-```
-
-Build and deploy the frontend after the API is ready:
-
-```sh
-cd frontend
-npm run build
-cd ..
-npx firebase-tools use wtwr-project-493900
-npx firebase-tools deploy --only hosting
-```
-
-After deployment, open the Firebase Hosting URL and verify sign-in, sign-out, email verification, protected dashboard access, and `/api/health`. Add the confirmed live URL to this README and the review PR. The dashboard inventory cards currently use sample data; deploying does not make those values live.
+The VM is scheduled to stop after four days, around October 26, 2026 (Central Time). The site may be unavailable after it stops. A verified Inventra account is required to use authenticated dashboard features.
