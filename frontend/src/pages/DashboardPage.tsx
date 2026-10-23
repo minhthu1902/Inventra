@@ -4,7 +4,7 @@ import StatCardItem from "@/components/dashboard/StatCardItem";
 import InventoryTrendCard from "@/components/dashboard/InventoryTrendCard";
 import AlertsCard from "@/components/dashboard/AlertsCard";
 import RecentTransactionsCard from "@/components/dashboard/RecentTransactionsCard";
-import AIInsightCard from "@/components/dashboard/AIInsightCard";
+import AIInventoryInvestigator from "@/features/ai/AIInventoryInvestigator";
 import QuickActionsCard from "@/components/dashboard/QuickActionsCard";
 import WarehouseUtilizationCard from "@/components/dashboard/WarehouseUtilizationCard";
 import WorkflowCard from "@/components/dashboard/WorkflowCard";
@@ -133,7 +133,7 @@ export default function Home() {
           <RecentTransactionsCard transactions={transactions} />
         </div>
         <div className="flex min-w-0 flex-col gap-5">
-          <AIInsightCard />
+          <AIInventoryInvestigator />
           <AlertsCard alerts={alerts} />
         </div>
       </div>
