@@ -12,6 +12,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 export const app = express();
 
 app.disable("x-powered-by");
+app.set("trust proxy", env.NODE_ENV === "production" ? 1 : false);
 app.use(helmet());
 app.use(
   cors({
