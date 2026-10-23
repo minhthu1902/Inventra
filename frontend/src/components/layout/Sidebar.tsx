@@ -51,7 +51,7 @@ const navSections: NavSection[] = [
     title: "Analytics",
     items: [
       { label: "Reports", href: "/reports", icon: BarChart3 },
-      { label: "AI Investigator", href: "/ai-investigator", icon: Sparkles },
+      { label: "AI Investigator", href: "/#investigator-title", icon: Sparkles, isAvailable: true },
     ],
   },
   {
@@ -111,7 +111,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <ul className="space-y-1">
                 {section.items.map((item) => (
                   <li key={item.href}>
-                    <NavEntry item={item} isActive={item.href === pathname} onNavigate={onClose} />
+                    <NavEntry
+                      item={item}
+                      isActive={item.href === pathname || item.href.startsWith(`${pathname}#`)}
+                      onNavigate={onClose}
+                    />
                   </li>
                 ))}
               </ul>
