@@ -20,6 +20,7 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   EMAIL_FROM: optionalEmail,
+  DEMO_EMAIL_VERIFICATION_LINKS: z.enum(["true", "false"]).default("false"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
