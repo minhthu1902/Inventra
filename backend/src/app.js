@@ -6,6 +6,7 @@ import { env } from "./config/env.js";
 import authRoutes from "./auth/authRoutes.js";
 import inventoryRoutes from "./inventory/inventoryRoutes.js";
 import dashboardRoutes from "./dashboard/dashboardRoutes.js";
+import aiRoutes from "./ai/aiRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 export const app = express();
@@ -27,5 +28,6 @@ app.get("/api/health", (_request, response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/ai", aiRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
