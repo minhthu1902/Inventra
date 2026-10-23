@@ -87,22 +87,30 @@ export default function Home() {
   })) ?? [];
 
   const transactions: RecentTransaction[] = summary?.recentTransactions.map((transaction) => {
-    const type = transaction.type === "inbound" ? "Inbound" : transaction.type === "outbound" ? "Outbound" : "Adjustment";
+    const type = transaction.type === "inbound" ? "Inbound" : transaction.type === "outbound" ? "Outbound" : transaction.type === "transfer" ? "Transfer" : "Adjustment";
     return {
       id: transaction.id,
       date: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(transaction.createdAt)),
       type,
       reference: transaction.reference || "—",
       item: transaction.item?.name ?? "Unknown item",
-      quantity: `${type === "Outbound" || (type === "Adjustment" && transaction.adjustmentDirection === "decrease") ? "-" : "+"}${transaction.quantity}`,
-      location: `${transaction.warehouse?.code ?? ""} ${transaction.location?.code ?? ""}`.trim() || "—",
-      status: type === "Inbound" ? "Received" : type === "Outbound" ? "Shipped" : "Adjusted",
+      quantity: `${type === "Outbound" || (type === "Adjustment" && transaction.adjustmentDirection === "decrease") ? "-" : type === "Transfer" ? "↔ " : "+"}${transaction.quantity}`,
+      location: type === "Transfer"
+        ? `${transaction.warehouse?.code ?? ""} ${transaction.location?.code ?? ""} → ${transaction.destinationWarehouse?.code ?? ""} ${transaction.destinationLocation ?? ""}`.trim()
+        : `${transaction.warehouse?.code ?? ""} ${transaction.location?.code ?? ""}`.trim() || "—",
+      status: type === "Inbound" ? "Received" : type === "Outbound" ? "Shipped" : type === "Transfer" ? "Transferred" : "Adjusted",
     };
   }) ?? [];
 
   return (
     <div className="flex flex-col gap-5">
       <DashboardHeader />
+
+      {summary?.offline && (
+        <p className="rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-text-primary" role="status">
+          Offline view · showing the last dashboard snapshot. Pending inventory movements are included in the total units.
+        </p>
+      )}
 
       {error && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/20 bg-danger-bg px-4 py-3 text-sm text-danger" role="alert">

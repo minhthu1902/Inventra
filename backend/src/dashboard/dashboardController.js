@@ -82,6 +82,9 @@ export async function getDashboardSummary(request, response) {
       .populate("inventoryItemId", "sku name unit")
       .populate("warehouseId", "name code")
       .populate("locationId", "code")
+      .populate("destinationInventoryItemId", "sku name unit")
+      .populate("destinationWarehouseId", "name code")
+      .populate("destinationLocationId", "code")
       .sort({ createdAt: -1 })
       .limit(8)
       .lean(),
@@ -134,6 +137,9 @@ export async function getDashboardSummary(request, response) {
       item: transaction.inventoryItemId,
       warehouse: transaction.warehouseId,
       location: transaction.locationId,
+      destinationItem: transaction.destinationInventoryItemId,
+      destinationWarehouse: transaction.destinationWarehouseId,
+      destinationLocation: transaction.destinationLocationId?.code ?? null,
     })),
   });
 }

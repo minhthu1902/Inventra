@@ -27,6 +27,7 @@ const inventoryItemSchema = new mongoose.Schema(
       uppercase: true,
       maxlength: 64,
     },
+    barcode: { type: String, trim: true, maxlength: 80, default: "" },
     name: { type: String, required: true, trim: true, maxlength: 160 },
     category: { type: String, trim: true, maxlength: 80, default: "General" },
     unit: { type: String, trim: true, maxlength: 24, default: "each" },

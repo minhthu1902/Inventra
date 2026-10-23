@@ -22,6 +22,7 @@ export const createInventoryItemSchema = z.object({
   warehouseId: objectIdSchema,
   locationId: objectIdSchema,
   sku: z.string().trim().min(1).max(64),
+  barcode: z.string().trim().max(80).optional().default(""),
   name: z.string().trim().min(1).max(160),
   category: z.string().trim().max(80).optional().default("General"),
   unit: z.string().trim().max(24).optional().default("each"),
@@ -49,6 +50,7 @@ export const stockMovementSchema = z
     quantity: positiveQuantitySchema,
     reference: z.string().trim().max(80).optional().default(""),
     note: z.string().trim().max(500).optional().default(""),
+    clientOperationId: z.uuid().optional(),
   })
   .superRefine((movement, context) => {
     if (movement.type === "adjustment" && !movement.direction) {
@@ -67,6 +69,15 @@ export const stockMovementSchema = z
     }
   });
 
+export const inventoryTransferSchema = z.object({
+  destinationWarehouseId: objectIdSchema,
+  destinationLocationId: objectIdSchema,
+  quantity: positiveQuantitySchema,
+  reference: z.string().trim().max(80).optional().default(""),
+  note: z.string().trim().max(500).optional().default(""),
+  clientOperationId: z.uuid().optional(),
+});
+
 export const inventoryQuerySchema = z.object({
   search: z.string().trim().max(120).optional().default(""),
   category: z.string().trim().max(80).optional(),
@@ -77,7 +88,7 @@ export const inventoryQuerySchema = z.object({
 });
 
 export const transactionQuerySchema = z.object({
-  type: z.enum(["inbound", "outbound", "adjustment"]).optional(),
+  type: z.enum(["inbound", "outbound", "adjustment", "transfer"]).optional(),
   inventoryItemId: objectIdSchema.optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(25),

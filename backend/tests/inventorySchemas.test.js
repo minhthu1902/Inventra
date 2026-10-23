@@ -4,7 +4,9 @@ import {
   calculateStockMovement,
   createInventoryItemSchema,
   inventoryQuerySchema,
+  inventoryTransferSchema,
   stockMovementSchema,
+  transactionQuerySchema,
 } from "../src/inventory/inventorySchemas.js";
 
 test("inventory create schema normalizes identifiers and defaults", () => {
@@ -77,4 +79,22 @@ test("stock movement request requires a supported type and positive quantity", (
     stockMovementSchema.safeParse({ type: "inbound", quantity: 0 }).success,
     false,
   );
+});
+
+test("offline transfers require owned destination references and a stable operation ID", () => {
+  const result = inventoryTransferSchema.parse({
+    destinationWarehouseId: "64b000000000000000000001",
+    destinationLocationId: "64b000000000000000000002",
+    quantity: 5,
+    clientOperationId: "a4234567-e89b-12d3-a456-426614174000",
+  });
+
+  assert.equal(result.reference, "");
+  assert.equal(result.note, "");
+  assert.equal(result.quantity, 5);
+  assert.equal(inventoryTransferSchema.safeParse({
+    ...result,
+    clientOperationId: "not-a-uuid",
+  }).success, false);
+  assert.equal(transactionQuerySchema.safeParse({ type: "transfer" }).success, true);
 });

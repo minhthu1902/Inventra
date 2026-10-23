@@ -1,4 +1,16 @@
+import {
+  enqueueStockMovement,
+  getActiveOfflineOwner,
+  listQueuedMovements,
+  readOfflineSnapshot,
+  saveOfflineSnapshot,
+  syncQueuedMovements,
+  withPendingStock,
+  type MovementPayload,
+} from "./OfflineInventory";
+
 export type DashboardSummary = {
+  offline?: boolean;
   totalSkus: number;
   totalUnits: number;
   lowStockItems: number;
@@ -16,7 +28,7 @@ export type DashboardSummary = {
   }>;
   recentTransactions: Array<{
     id: string;
-    type: "inbound" | "outbound" | "adjustment";
+    type: "inbound" | "outbound" | "adjustment" | "transfer";
     adjustmentDirection: "increase" | "decrease" | null;
     quantity: number;
     stockAfter: number;
@@ -25,6 +37,9 @@ export type DashboardSummary = {
     item: { sku: string; name: string; unit: string } | null;
     warehouse: { name: string; code: string } | null;
     location: { code: string } | null;
+    destinationItem?: { sku: string; name: string; unit: string } | null;
+    destinationWarehouse?: { name: string; code: string } | null;
+    destinationLocation?: string | null;
   }>;
 };
 
@@ -46,6 +61,7 @@ export type WarehouseUtilization = {
 export type InventoryItem = {
   _id: string;
   sku: string;
+  barcode: string;
   name: string;
   category: string;
   unit: string;
@@ -96,31 +112,89 @@ async function requestJson<T>(path: string, method = "GET", body?: unknown): Pro
 }
 
 export function getDashboardSummary() {
-  return requestJson<DashboardSummary>("/api/dashboard/summary");
+  return dashboardRequest<DashboardSummary>("/api/dashboard/summary", "dashboard:summary").then(async (summary) => {
+    if (!summary.offline) return summary;
+    const ownerId = await getActiveOfflineOwner().catch(() => null);
+    if (!ownerId) return summary;
+    const operations = await listQueuedMovements(ownerId).catch(() => []);
+    const pendingDelta = operations.reduce((total, operation) => {
+      if (operation.payload.type === "transfer") return total;
+      const increases = operation.payload.type === "inbound" || (operation.payload.type === "adjustment" && operation.payload.direction === "increase");
+      return total + (increases ? operation.payload.quantity : -operation.payload.quantity);
+    }, 0);
+    return { ...summary, totalUnits: Math.max(0, summary.totalUnits + pendingDelta) };
+  });
 }
 
 export function getInventoryTrend(days: number) {
-  return requestJson<{ trend: TrendPoint[] }>(`/api/dashboard/trend?days=${days}`);
+  return dashboardRequest<{ trend: TrendPoint[] }>(`/api/dashboard/trend?days=${days}`, `dashboard:trend:${days}`);
 }
 
 export function getWarehouseUtilization() {
-  return requestJson<{ utilization: WarehouseUtilization[] }>("/api/dashboard/warehouse-utilization");
+  return dashboardRequest<{ utilization: WarehouseUtilization[] }>("/api/dashboard/warehouse-utilization", "dashboard:warehouse-utilization");
 }
 
-export function getInventory(params: { search?: string; category?: string; stockStatus?: "all" | "low" | "out"; page?: number; limit?: number }) {
+async function dashboardRequest<T extends Record<string, unknown>>(path: string, cacheKey: string): Promise<T & { offline?: boolean }> {
+  const ownerId = await getActiveOfflineOwner().catch(() => null);
+  try {
+    const result = await requestJson<T>(path);
+    if (ownerId) await saveOfflineSnapshot(ownerId, cacheKey, result).catch(() => undefined);
+    return { ...result, offline: false };
+  } catch (error) {
+    if (!ownerId) throw error;
+    const cached = await readOfflineSnapshot<T>(ownerId, cacheKey);
+    if (!cached) throw error;
+    return { ...cached, offline: true };
+  }
+}
+
+export async function getInventory(params: { search?: string; category?: string; warehouseId?: string; stockStatus?: "all" | "low" | "out"; page?: number; limit?: number }) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== "") query.set(key, String(value));
   }
-  return requestJson<{ items: InventoryItem[]; pagination: { page: number; limit: number; total: number; pages: number } }>(`/api/inventory?${query}`);
+  const cacheKey = `inventory:${query.toString()}`;
+  const ownerId = await getActiveOfflineOwner().catch(() => null);
+  try {
+    const result = await requestJson<{ items: InventoryItem[]; pagination: { page: number; limit: number; total: number; pages: number } }>(`/api/inventory?${query}`);
+    if (ownerId) await saveOfflineSnapshot(ownerId, cacheKey, result).catch(() => undefined);
+    const operations = ownerId ? await listQueuedMovements(ownerId).catch(() => []) : [];
+    return { ...result, items: withPendingStock(result.items, operations), offline: false };
+  } catch (error) {
+    if (!ownerId) throw error;
+    const cached = await readOfflineSnapshot<{ items: InventoryItem[]; pagination: { page: number; limit: number; total: number; pages: number } }>(ownerId, cacheKey);
+    if (!cached) throw error;
+    const operations = await listQueuedMovements(ownerId);
+    return { ...cached, items: withPendingStock(cached.items, operations), offline: true };
+  }
 }
 
-export function getWarehouses() {
-  return requestJson<{ warehouses: WarehouseRecord[] }>("/api/inventory/warehouses");
+export async function getWarehouses() {
+  const ownerId = await getActiveOfflineOwner().catch(() => null);
+  try {
+    const result = await requestJson<{ warehouses: WarehouseRecord[] }>("/api/inventory/warehouses");
+    if (ownerId) await saveOfflineSnapshot(ownerId, "warehouses", result).catch(() => undefined);
+    return result;
+  } catch (error) {
+    if (!ownerId) throw error;
+    const cached = await readOfflineSnapshot<{ warehouses: WarehouseRecord[] }>(ownerId, "warehouses");
+    if (!cached) throw error;
+    return cached;
+  }
 }
 
-export function getWarehouseLocations(warehouseId: string) {
-  return requestJson<{ locations: LocationRecord[] }>(`/api/inventory/warehouses/${warehouseId}/locations`);
+export async function getWarehouseLocations(warehouseId: string) {
+  const ownerId = await getActiveOfflineOwner().catch(() => null);
+  try {
+    const result = await requestJson<{ locations: LocationRecord[] }>(`/api/inventory/warehouses/${warehouseId}/locations`);
+    if (ownerId) await saveOfflineSnapshot(ownerId, `locations:${warehouseId}`, result).catch(() => undefined);
+    return result;
+  } catch (error) {
+    if (!ownerId) throw error;
+    const cached = await readOfflineSnapshot<{ locations: LocationRecord[] }>(ownerId, `locations:${warehouseId}`);
+    if (!cached) throw error;
+    return cached;
+  }
 }
 
 export function createWarehouse(data: { name: string; code: string; capacityUnits: number }) {
@@ -132,7 +206,7 @@ export function createLocation(data: { warehouseId: string; code: string; zone: 
 }
 
 export function createInventoryItem(data: {
-  warehouseId: string; locationId: string; sku: string; name: string; category: string;
+  warehouseId: string; locationId: string; sku: string; barcode: string; name: string; category: string;
   unit: string; quantity: number; reorderPoint: number; unitCost: number;
   isPerishable: boolean; expiryDate: string | null; batchNumber: string;
 }) {
@@ -140,7 +214,7 @@ export function createInventoryItem(data: {
 }
 
 export function updateInventoryItem(itemId: string, data: {
-  name?: string; category?: string; unit?: string; reorderPoint?: number; unitCost?: number;
+  name?: string; barcode?: string; category?: string; unit?: string; reorderPoint?: number; unitCost?: number;
   isPerishable?: boolean; expiryDate?: string | null; batchNumber?: string;
 }) {
   return requestJson<{ item: InventoryItem }>(`/api/inventory/${itemId}`, "PATCH", data);
@@ -152,6 +226,15 @@ export function createStockMovement(itemId: string, data: {
   quantity: number;
   reference?: string;
   note?: string;
+  clientOperationId?: string;
 }) {
   return requestJson(`/api/inventory/${itemId}/transactions`, "POST", data);
+}
+
+export async function recordStockMovement(item: InventoryItem, data: MovementPayload) {
+  const ownerId = await getActiveOfflineOwner();
+  if (!ownerId) throw new Error("Your offline inventory profile is not ready. Reconnect and sign in before recording movements.");
+  const operation = await enqueueStockMovement(ownerId, item, data);
+  if (navigator.onLine) void syncQueuedMovements(ownerId);
+  return operation;
 }

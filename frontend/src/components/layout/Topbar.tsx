@@ -1,5 +1,6 @@
 import { Search, Bell, ChevronDown, Warehouse, LogOut, Menu } from "lucide-react";
 import { signOut } from "@/utils/AuthApi.js";
+import { clearCachedOfflineUser } from "@/utils/OfflineInventory";
 
 export type AccountUser = {
   id: string;
@@ -16,6 +17,7 @@ export default function Topbar({ user, onMenuClick }: TopbarProps) {
   async function handleSignOut() {
     try {
       await signOut();
+      await clearCachedOfflineUser().catch(() => undefined);
       window.dispatchEvent(new Event("inventra:auth-change"));
     } catch {
       return;

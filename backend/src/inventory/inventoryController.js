@@ -9,6 +9,7 @@ import {
   createLocationSchema,
   createWarehouseSchema,
   inventoryQuerySchema,
+  inventoryTransferSchema,
   stockMovementSchema,
   transactionQuerySchema,
   updateInventoryItemSchema,
@@ -102,7 +103,12 @@ export async function listInventory(request, response) {
   if (warehouseId) filter.warehouseId = warehouseId;
   if (search) {
     const pattern = new RegExp(escapeRegex(search), "i");
-    filter.$or = [{ sku: pattern }, { name: pattern }, { category: pattern }];
+    filter.$or = [
+      { sku: pattern },
+      { barcode: pattern },
+      { name: pattern },
+      { category: pattern },
+    ];
   }
   if (stockStatus === "out") filter.quantity = 0;
   if (stockStatus === "low") {
@@ -221,7 +227,25 @@ export async function createStockMovement(request, response) {
   if (!parsed.success) return rejectValidation(response, parsed);
 
   const ownerId = request.auth.userId;
-  const { type, direction, quantity, reference, note } = parsed.data;
+  const { type, direction, quantity, reference, note, clientOperationId } =
+    parsed.data;
+  if (clientOperationId) {
+    const existing = await Transaction.findOne({ ownerId, clientOperationId });
+    if (existing) {
+      if (String(existing.inventoryItemId) !== request.params.itemId || existing.type !== type || existing.quantity !== quantity) {
+        return response.status(409).json({ message: "This offline operation ID was already used for a different movement." });
+      }
+      const currentItem = await InventoryItem.findOne({
+        _id: request.params.itemId,
+        ownerId,
+      });
+      return response.status(200).json({
+        item: currentItem,
+        transaction: existing,
+        replayed: true,
+      });
+    }
+  }
   const movementDirection =
     type === "inbound" || (type === "adjustment" && direction === "increase")
       ? "increase"
@@ -268,6 +292,7 @@ export async function createStockMovement(request, response) {
       note,
       performedBy: ownerId,
       dataSource: "user-entered",
+      ...(clientOperationId ? { clientOperationId } : {}),
     });
     return response.status(201).json({ item, transaction });
   } catch (error) {
@@ -275,6 +300,172 @@ export async function createStockMovement(request, response) {
       { _id: request.params.itemId, ownerId },
       { $inc: { quantity: -sign * quantity } },
     );
+    if (error?.code === 11000 && clientOperationId) {
+      const [transaction, currentItem] = await Promise.all([
+        Transaction.findOne({ ownerId, clientOperationId }),
+        InventoryItem.findOne({ _id: request.params.itemId, ownerId }),
+      ]);
+      if (transaction) {
+        return response
+          .status(200)
+          .json({ item: currentItem, transaction, replayed: true });
+      }
+    }
+    throw error;
+  }
+}
+
+export async function transferInventory(request, response) {
+  if (!mongoose.isValidObjectId(request.params.itemId)) {
+    return invalidReference(response, "Invalid inventory item id");
+  }
+  const parsed = inventoryTransferSchema.safeParse(request.body);
+  if (!parsed.success) return rejectValidation(response, parsed);
+
+  const ownerId = request.auth.userId;
+  const { destinationWarehouseId, destinationLocationId, quantity, reference, note, clientOperationId } = parsed.data;
+  const sourceFilter = { _id: request.params.itemId, ownerId };
+
+  if (clientOperationId) {
+    const existing = await Transaction.findOne({ ownerId, clientOperationId });
+    if (existing) {
+      if (existing.type !== "transfer" || String(existing.inventoryItemId) !== request.params.itemId || existing.quantity !== quantity || String(existing.destinationWarehouseId) !== destinationWarehouseId || String(existing.destinationLocationId) !== destinationLocationId) {
+        return response.status(409).json({ message: "This offline operation ID was already used for a different movement." });
+      }
+      const [sourceItem, destinationItem] = await Promise.all([
+        InventoryItem.findOne({ _id: existing.inventoryItemId, ownerId }),
+        InventoryItem.findOne({ _id: existing.destinationInventoryItemId, ownerId }),
+      ]);
+      return response.status(200).json({ sourceItem, destinationItem, transaction: existing, replayed: true });
+    }
+  }
+
+  const source = await InventoryItem.findOneAndUpdate(
+    { ...sourceFilter, quantity: { $gte: quantity } },
+    { $inc: { quantity: -quantity } },
+    { new: true, runValidators: true },
+  );
+  if (!source) {
+    const exists = await InventoryItem.exists(sourceFilter);
+    if (!exists) return response.status(404).json({ message: "Inventory item not found" });
+    return response.status(409).json({ message: "Insufficient stock for this transfer" });
+  }
+
+  let destinationItem = null;
+  let destinationAdded = false;
+  let destinationCreated = false;
+  let destinationLocation = null;
+  try {
+    const [warehouse, location] = await Promise.all([
+      Warehouse.findOne({ _id: destinationWarehouseId, ownerId }),
+      Location.findOne({ _id: destinationLocationId, warehouseId: destinationWarehouseId, ownerId }),
+    ]);
+    if (!warehouse || !location) {
+      await InventoryItem.updateOne(sourceFilter, { $inc: { quantity } });
+      return invalidReference(response, "Destination warehouse or location is not available to this user");
+    }
+    if (String(source.warehouseId) === String(destinationWarehouseId)) {
+      await InventoryItem.updateOne(sourceFilter, { $inc: { quantity } });
+      return response.status(400).json({ message: "Choose another warehouse for a transfer." });
+    }
+
+    destinationItem = await InventoryItem.findOne({ ownerId, warehouseId: destinationWarehouseId, sku: source.sku });
+    if (destinationItem) {
+      if (String(destinationItem.locationId) !== String(destinationLocationId)) {
+        await InventoryItem.updateOne(sourceFilter, { $inc: { quantity } });
+        return response.status(409).json({ message: "This SKU already uses another location in the destination warehouse. Choose that location." });
+      }
+      destinationItem = await InventoryItem.findOneAndUpdate(
+        { _id: destinationItem._id, ownerId },
+        { $inc: { quantity } },
+        { new: true, runValidators: true },
+      );
+      destinationAdded = true;
+    } else {
+      try {
+        destinationItem = await InventoryItem.create({
+          ownerId,
+          warehouseId: destinationWarehouseId,
+          locationId: destinationLocationId,
+          sku: source.sku,
+          barcode: source.barcode,
+          name: source.name,
+          category: source.category,
+          unit: source.unit,
+          quantity,
+          reorderPoint: source.reorderPoint,
+          unitCost: source.unitCost,
+          isPerishable: source.isPerishable,
+          expiryDate: source.expiryDate,
+          batchNumber: source.batchNumber,
+          dataSource: "user-entered",
+        });
+        destinationCreated = true;
+        destinationAdded = true;
+      } catch (error) {
+        if (error?.code !== 11000) throw error;
+        const racedDestination = await InventoryItem.findOne({ ownerId, warehouseId: destinationWarehouseId, sku: source.sku });
+        if (!racedDestination || String(racedDestination.locationId) !== String(destinationLocationId)) {
+          const conflict = new Error("This SKU was added to a different destination location during the transfer.");
+          conflict.status = 409;
+          throw conflict;
+        }
+        destinationItem = await InventoryItem.findOneAndUpdate(
+          { _id: racedDestination._id, ownerId },
+          { $inc: { quantity } },
+          { new: true, runValidators: true },
+        );
+        destinationAdded = true;
+      }
+    }
+    destinationLocation = location;
+
+    const transaction = await Transaction.create({
+      ownerId,
+      inventoryItemId: source._id,
+      warehouseId: source.warehouseId,
+      locationId: source.locationId,
+      destinationInventoryItemId: destinationItem._id,
+      destinationWarehouseId,
+      destinationLocationId,
+      type: "transfer",
+      quantity,
+      stockBefore: source.quantity + quantity,
+      stockAfter: source.quantity,
+      reference,
+      note,
+      performedBy: ownerId,
+      dataSource: "user-entered",
+      ...(clientOperationId ? { clientOperationId } : {}),
+    });
+    return response.status(201).json({
+      sourceItem: source,
+      destinationItem,
+      transaction: {
+        ...transaction.toObject(),
+        destinationWarehouse: warehouse,
+        destinationLocation,
+      },
+    });
+  } catch (error) {
+    if (destinationAdded && destinationItem) {
+      if (destinationCreated) {
+        await InventoryItem.deleteOne({ _id: destinationItem._id, ownerId, quantity });
+      } else {
+        await InventoryItem.updateOne({ _id: destinationItem._id, ownerId }, { $inc: { quantity: -quantity } });
+      }
+    }
+    await InventoryItem.updateOne(sourceFilter, { $inc: { quantity } });
+    if (error?.code === 11000 && clientOperationId) {
+      const existing = await Transaction.findOne({ ownerId, clientOperationId });
+      if (existing) {
+        const [sourceItem, targetItem] = await Promise.all([
+          InventoryItem.findOne({ _id: existing.inventoryItemId, ownerId }),
+          InventoryItem.findOne({ _id: existing.destinationInventoryItemId, ownerId }),
+        ]);
+        return response.status(200).json({ sourceItem, destinationItem: targetItem, transaction: existing, replayed: true });
+      }
+    }
     throw error;
   }
 }
@@ -292,6 +483,9 @@ export async function listTransactions(request, response) {
       .populate("inventoryItemId", "sku name unit")
       .populate("warehouseId", "name code")
       .populate("locationId", "code")
+      .populate("destinationInventoryItemId", "sku name unit")
+      .populate("destinationWarehouseId", "name code")
+      .populate("destinationLocationId", "code")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

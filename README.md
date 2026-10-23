@@ -28,3 +28,9 @@ Inventra's AI Inventory Investigator is available through the authenticated `POS
 The feature uses account-scoped inventory data and always has local rule-based analysis available. When the optional OpenAI Chat Completions API is configured on the backend, it can also produce a natural-language explanation in response to a question. The assistant supports investigation and recommendations; staff remain responsible for reviewing signals and recording inventory decisions. OpenAI processing is optional and uses a reduced set of the signed-in account's inventory facts.
 
 New accounts can load a small synthetic example from the Investigator panel to try the analysis. The endpoint only adds demo records when the account has no inventory and clearly labels them as synthetic.
+
+## Offline-First Inventory
+
+After inventory has been loaded while online, Inventra caches the app shell and account-scoped inventory snapshots in the browser. Staff can record Receive, Issue, Transfer, and adjustment movements offline; the local stock view updates immediately and marks those movements as pending sync. The sync manager retries when the connection returns, the app is reopened, or its tab regains focus. The API validates each movement, prevents duplicate submissions, and reports conflicts for review.
+
+Offline data is stored in IndexedDB on the current browser and device, so reviewers should open the inventory page online before testing offline behavior. The AI Investigator requires a connection to the backend; offline mode is for inventory operations and cached views.

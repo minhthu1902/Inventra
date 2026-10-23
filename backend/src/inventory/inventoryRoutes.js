@@ -11,6 +11,7 @@ import {
   listWarehouseLocations,
   listWarehouses,
   updateInventoryItem,
+  transferInventory,
 } from "./inventoryController.js";
 
 const router = Router();
@@ -26,5 +27,6 @@ router.post("/", createInventoryItem);
 router.get("/:itemId", getInventoryItem);
 router.patch("/:itemId", updateInventoryItem);
 router.post("/:itemId/transactions", createStockMovement);
+router.post("/:itemId/transfers", transferInventory);
 
 export default router;

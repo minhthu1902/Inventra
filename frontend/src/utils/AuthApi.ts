@@ -34,7 +34,7 @@ async function request(path: string, payload?: unknown, method = "POST"): Promis
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data.message || "Authentication request failed.") as ApiError;
-    error.code = data.code;
+    error.code = data.code ?? String(response.status);
     throw error;
   }
   return data;

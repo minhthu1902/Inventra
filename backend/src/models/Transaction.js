@@ -24,9 +24,24 @@ const transactionSchema = new mongoose.Schema(
       ref: "Location",
       required: true,
     },
+    destinationInventoryItemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InventoryItem",
+      default: null,
+    },
+    destinationWarehouseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Warehouse",
+      default: null,
+    },
+    destinationLocationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Location",
+      default: null,
+    },
     type: {
       type: String,
-      enum: ["inbound", "outbound", "adjustment"],
+      enum: ["inbound", "outbound", "adjustment", "transfer"],
       required: true,
     },
     adjustmentDirection: {
@@ -45,10 +60,18 @@ const transactionSchema = new mongoose.Schema(
       required: true,
     },
     dataSource: { type: String, default: "user-entered" },
+    clientOperationId: { type: String, maxlength: 64 },
   },
   { timestamps: true, versionKey: false },
 );
 
 transactionSchema.index({ ownerId: 1, createdAt: -1 });
+transactionSchema.index(
+  { ownerId: 1, clientOperationId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientOperationId: { $type: "string" } },
+  },
+);
 
 export const Transaction = mongoose.model("Transaction", transactionSchema);

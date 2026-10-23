@@ -326,7 +326,7 @@ async function seed() {
 
   await Transaction.insertMany(transactions);
   console.info(
-    `Seeded ${items.length} synthetic items and ${transactions.length} transactions for ${email}.`,
+    `Saved synthetic demo data to MongoDB for ${email}: 2 warehouses, 3 locations, ${items.length} inventory items, and ${transactions.length} transactions.`,
   );
 }
 

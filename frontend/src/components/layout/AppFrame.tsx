@@ -6,6 +6,11 @@ import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import type { AccountUser } from "@/components/layout/Topbar";
 import { getCurrentUser } from "@/utils/AuthApi.js";
+import {
+  activateOfflineSync,
+  cacheOfflineUser,
+  getCachedOfflineUser,
+} from "@/utils/OfflineInventory";
 
 export default function AppFrame({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -15,13 +20,29 @@ export default function AppFrame({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    let stopOfflineSync: (() => void) | undefined;
     const verifySession = () => {
       getCurrentUser()
         .then(({ user: currentUser }) => {
-          if (active) setUser(currentUser);
-        })
-        .catch(() => {
           if (!active) return;
+          setUser(currentUser);
+          void cacheOfflineUser(currentUser);
+          stopOfflineSync?.();
+          stopOfflineSync = activateOfflineSync(currentUser.id);
+        })
+        .catch(async (error: unknown) => {
+          if (!active) return;
+          const status = (error as { code?: string })?.code;
+          if (status !== "401" && status !== "403") {
+            const cachedUser = await getCachedOfflineUser().catch(() => null);
+            if (!active) return;
+            if (cachedUser) {
+              setUser(cachedUser);
+              stopOfflineSync?.();
+              stopOfflineSync = activateOfflineSync(cachedUser.id);
+              return;
+            }
+          }
           setUser(null);
           navigate("/auth", { replace: true });
         });
@@ -31,6 +52,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
     window.addEventListener("inventra:auth-change", verifySession);
     return () => {
       active = false;
+      stopOfflineSync?.();
       window.removeEventListener("inventra:auth-change", verifySession);
     };
   }, [location.key, navigate]);
