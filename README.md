@@ -163,4 +163,4 @@ Potential follow-up work includes importing a licensed subset of a public retail
 
 Open Inventra at [https://35.239.213.104](https://35.239.213.104/). The demo runs on a Google Compute Engine VM. Nginx serves the Vite frontend over HTTPS and proxies API requests to the Express backend; MongoDB Atlas M0 stores application data.
 
-The VM is scheduled to stop after four days, around October 26, 2026 (Central Time). The site may be unavailable after it stops. A verified Inventra account is required to use authenticated dashboard features.
+The VM is scheduled to stop after four days, around October 26, 2026 (Central Time). The site may be unavailable after it stops. New visitors can register from the sign-in page. On this demo deployment, email delivery is disabled and the one-time verification link appears on screen after sign-up; a verified account and valid session are still required to open the dashboard.
