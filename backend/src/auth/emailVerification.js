@@ -41,11 +41,18 @@ export async function sendVerificationEmail({ email, name, token }) {
   const transport = getTransport();
 
   if (!transport) {
-    if (env.NODE_ENV === "production") {
+    if (
+      env.NODE_ENV === "production" &&
+      env.DEMO_EMAIL_VERIFICATION_LINKS !== "true"
+    ) {
       throw new Error("Email delivery is not configured");
     }
     console.info(`Development email verification link for ${email}: ${verificationUrl}`);
-    return { delivered: false, verificationUrl };
+    return {
+      delivered: false,
+      verificationUrl,
+      demoMode: env.NODE_ENV === "production",
+    };
   }
 
   await transport.sendMail({
