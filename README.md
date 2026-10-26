@@ -2,7 +2,7 @@
 
 Inventra is a web-based inventory management project for warehouse teams. It provides an inventory dashboard and tools for tracking stock and warehouse transactions, with an AI Inventory Investigator to help explain notable inventory patterns.
 
-The included inventory seed is synthetic demo data. It is not real HEB, Walmart, or other retailer operational data.
+The included inventory seed is synthetic demo data. It is not real retailer operational data.
 
 ## Live Demo
 
