@@ -6,7 +6,7 @@ The included inventory seed is synthetic demo data. It is not real retailer oper
 
 ## Live Demo
 
-Open [Inventra](https://35.239.213.104/), register an account, and verify it with the link shown after sign-up. The dashboard's AI Inventory Investigator can load a small synthetic dataset for a new account so reviewers can try the analysis.
+Open [Inventra](https://136.80.5.76/), register an account, and verify it with the link shown after sign-up. The dashboard's AI Inventory Investigator can load a small synthetic dataset for a new account so reviewers can try the analysis.
 
 ## Technology
 
