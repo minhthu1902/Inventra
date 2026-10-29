@@ -16,6 +16,14 @@ function buildPoints(values: number[], max: number) {
   });
 }
 
+// Show at most maxLabels evenly spaced labels, always keeping the last one without crowding it
+function isAxisLabelShown(index: number, count: number, maxLabels: number) {
+  const lastIndex = count - 1;
+  if (index === lastIndex) return true;
+  const stride = Math.max(1, Math.ceil(lastIndex / (maxLabels - 1)));
+  return index % stride === 0 && lastIndex - index >= stride / 2;
+}
+
 function toPath(points: { x: number; y: number }[]) {
   return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
 }
@@ -84,10 +92,25 @@ export default function InventoryTrendCard({ trend, range, onRangeChange }: Inve
                   <circle key={index} cx={p.x} cy={p.y} r={3} fill="#0b63d8" />
                 ))}
               </svg>
-              <div className="mt-1 flex justify-between text-[11px] text-text-secondary">
-                {trend.map((point) => (
-                  <span key={point.label}>{point.label}</span>
-                ))}
+              <div className="relative mt-1 h-4 text-[11px] text-text-secondary">
+                {trend.map((point, index) => {
+                  const isLast = index === trend.length - 1;
+                  const visibility = [
+                    isAxisLabelShown(index, trend.length, 4) ? "inline" : "hidden",
+                    isAxisLabelShown(index, trend.length, 7) ? "sm:inline" : "sm:hidden",
+                  ].join(" ");
+                  const align = trend.length > 1 && index === 0 ? "" : trend.length > 1 && isLast ? "-translate-x-full" : "-translate-x-1/2";
+                  const x = trend.length > 1 ? stockPoints[index].x : CHART_WIDTH / 2;
+                  return (
+                    <span
+                      key={point.label}
+                      className={`absolute top-0 whitespace-nowrap ${align} ${visibility}`}
+                      style={{ left: `${(x / CHART_WIDTH) * 100}%` }}
+                    >
+                      {point.label}
+                    </span>
+                  );
+                })}
               </div>
             </>
           ) : (
