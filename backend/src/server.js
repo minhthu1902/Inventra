@@ -21,6 +21,11 @@ async function startServer() {
   process.once("SIGTERM", () => shutdown("SIGTERM"));
 }
 
+// Log stray promise rejections instead of letting Node terminate the API process
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
+
 startServer().catch((error) => {
   console.error("Failed to start Inventra API:", error);
   process.exit(1);

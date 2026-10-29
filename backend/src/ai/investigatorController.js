@@ -202,7 +202,8 @@ async function askModel(question, items, transactions, findings) {
     });
     if (!response.ok) throw new Error(`AI provider returned ${response.status}`);
     const result = await response.json();
-    return result.choices?.[0]?.message?.content?.trim();
+    const content = result?.choices?.[0]?.message?.content;
+    return typeof content === "string" ? content.trim() : "";
   } finally {
     clearTimeout(timeout);
   }
@@ -214,25 +215,44 @@ export async function askInventoryInvestigator(request, response) {
     return response.status(400).json({ message: "Question must be 500 characters or fewer." });
   }
 
+  if (!mongoose.isValidObjectId(request.auth?.userId)) {
+    return response.status(401).json({ message: "Authentication required" });
+  }
+
   const ownerId = new mongoose.Types.ObjectId(request.auth.userId);
   const since = new Date(Date.now() - 30 * DAY_MS);
-  const [items, transactions] = await Promise.all([
-    InventoryItem.find({ ownerId }).lean(),
-    Transaction.find({ ownerId, createdAt: { $gte: since } })
-      .populate("inventoryItemId", "sku name unit")
-      .sort({ createdAt: -1 })
-      .limit(500)
-      .lean(),
-  ]);
-  const findings = analyzeMovements(items, transactions);
+  let items;
+  let transactions;
+  let findings;
+  try {
+    [items, transactions] = await Promise.all([
+      InventoryItem.find({ ownerId }).lean(),
+      Transaction.find({ ownerId, createdAt: { $gte: since } })
+        .populate("inventoryItemId", "sku name unit")
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean(),
+    ]);
+    findings = analyzeMovements(items, transactions);
+  } catch (error) {
+    console.error("AI Investigator analysis failed:", error);
+    return response.status(503).json({
+      message: "The Inventory Investigator could not analyze your data right now. Please try again in a moment.",
+    });
+  }
+
   let answer = makeLocalAnswer(parsed.data.question, findings, transactions.length);
   let generatedBy = "Local analysis";
 
   if (aiConfig.OPENAI_API_KEY) {
     try {
-      answer = (await askModel(parsed.data.question, items, transactions, findings)) || answer;
-      generatedBy = "OpenAI";
-    } catch {
+      const modelAnswer = await askModel(parsed.data.question, items, transactions, findings);
+      if (modelAnswer) {
+        answer = modelAnswer;
+        generatedBy = "OpenAI";
+      }
+    } catch (error) {
+      console.warn("OpenAI request failed; using local analysis:", error.message);
       generatedBy = "Local analysis (AI service unavailable)";
     }
   }

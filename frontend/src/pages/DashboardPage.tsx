@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import StatCardItem from "@/components/dashboard/StatCardItem";
 import InventoryTrendCard from "@/components/dashboard/InventoryTrendCard";
@@ -24,7 +23,6 @@ const trendDays = { "7D": 7, "30D": 30, "90D": 90 } as const;
 type TrendRange = keyof typeof trendDays;
 
 export default function Home() {
-  const { hash } = useLocation();
   const [range, setRange] = useState<TrendRange>("7D");
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
@@ -32,12 +30,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
-
-  useEffect(() => {
-    if (hash === "#investigator-title") {
-      document.getElementById("investigator-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [hash]);
 
   useEffect(() => {
     let active = true;

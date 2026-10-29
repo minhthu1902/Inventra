@@ -1,4 +1,4 @@
-import { ArrowRight, Box, TrendingDown, ArrowDownToLine, ArrowUpFromLine, ArrowUp } from "lucide-react";
+import { Box, TrendingDown, ArrowDownToLine, ArrowUpFromLine, ArrowUp } from "lucide-react";
 import type { StatCard } from "@/utils/dashboardData";
 
 const iconMap = {
@@ -26,14 +26,11 @@ export default function StatCardItem({ stat }: { stat: StatCard }) {
 
   return (
     <div className="flex flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneMap[stat.iconTone]}`}>
-            <Icon className="h-4 w-4" />
-          </span>
-          <span className="text-sm font-medium text-text-secondary">{stat.label}</span>
-        </div>
-        <ArrowRight className="h-4 w-4 text-text-secondary" />
+      <div className="flex items-center gap-2">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneMap[stat.iconTone]}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="text-sm font-medium text-text-secondary">{stat.label}</span>
       </div>
       <div>
         <p className="text-2xl font-semibold text-text-primary">{stat.value}</p>

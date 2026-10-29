@@ -212,13 +212,14 @@ export type QuickAction = {
   description: string;
   icon: "receive" | "shipment" | "transfer" | "addItem";
   tone: "green" | "blue" | "purple" | "amber";
+  href: string;
 };
 
 export const quickActions: QuickAction[] = [
-  { id: "receive", label: "Receive Stock", description: "Create inbound", icon: "receive", tone: "green" },
-  { id: "shipment", label: "Create Shipment", description: "Process outbound", icon: "shipment", tone: "blue" },
-  { id: "transfer", label: "Transfer Stock", description: "Move between locations", icon: "transfer", tone: "purple" },
-  { id: "add-item", label: "Add Item", description: "New inventory item", icon: "addItem", tone: "amber" },
+  { id: "receive", label: "Receive Stock", description: "Pick an item, record inbound", icon: "receive", tone: "green", href: "/inventory" },
+  { id: "shipment", label: "Create Shipment", description: "Pick an item, record outbound", icon: "shipment", tone: "blue", href: "/inventory" },
+  { id: "transfer", label: "Transfer Stock", description: "Pick an item, move it", icon: "transfer", tone: "purple", href: "/inventory" },
+  { id: "add-item", label: "Add Item", description: "New inventory item", icon: "addItem", tone: "amber", href: "/inventory#add-item" },
 ];
 
 export const warehouseUtilization = {

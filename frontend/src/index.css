@@ -33,6 +33,26 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Tailwind 4 resets buttons to the default cursor; make every control look clickable */
+@layer base {
+  a[href],
+  button:not(:disabled),
+  select:not(:disabled),
+  summary,
+  [role="button"],
+  [role="tab"],
+  input[type="checkbox"]:not(:disabled),
+  label:has(> input[type="checkbox"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled {
+    cursor: not-allowed;
+  }
+}
+
 body {
   background: var(--color-background);
   color: var(--color-text-primary);

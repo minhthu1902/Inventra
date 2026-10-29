@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FileClock, Search, MoreHorizontal, ArrowDownToLine, ArrowUpFromLine, Repeat, SlidersHorizontal } from "lucide-react";
+import { FileClock, Search, ArrowDownToLine, ArrowUpFromLine, Repeat, SlidersHorizontal } from "lucide-react";
 
 export type RecentTransaction = {
   id: string;
@@ -70,13 +70,6 @@ export default function RecentTransactionsCard({ transactions }: RecentTransacti
               </button>
             ))}
           </div>
-          <select className="rounded-lg border border-border px-2 py-1.5 text-xs text-text-secondary">
-            <option>Today</option>
-            <option>This week</option>
-          </select>
-          <select className="hidden rounded-lg border border-border px-2 py-1.5 text-xs text-text-secondary sm:block">
-            <option>All Warehouses</option>
-          </select>
         </div>
       </div>
 
@@ -132,8 +125,7 @@ export default function RecentTransactionsCard({ transactions }: RecentTransacti
               <th className="pb-2 pr-4 font-medium">Item</th>
               <th className="pb-2 pr-4 font-medium">Quantity</th>
               <th className="pb-2 pr-4 font-medium">Location</th>
-              <th className="pb-2 pr-4 font-medium">Status</th>
-              <th className="pb-2 font-medium">Action</th>
+              <th className="pb-2 font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -153,15 +145,10 @@ export default function RecentTransactionsCard({ transactions }: RecentTransacti
                   <td className="py-2.5 pr-4 text-xs">{tx.item}</td>
                   <td className="py-2.5 pr-4 text-xs">{tx.quantity}</td>
                   <td className="py-2.5 pr-4 text-xs">{tx.location}</td>
-                  <td className="py-2.5 pr-4">
+                  <td className="py-2.5">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusConfig[tx.status]}`}>
                       {tx.status}
                     </span>
-                  </td>
-                  <td className="py-2.5">
-                    <button type="button" className="text-text-secondary hover:text-text-primary">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
                   </td>
                 </tr>
               );

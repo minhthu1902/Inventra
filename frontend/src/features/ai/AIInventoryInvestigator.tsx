@@ -59,8 +59,8 @@ export default function AIInventoryInvestigator() {
   }
 
   return (
-    <section className="ai-panel-gradient relative overflow-hidden rounded-xl p-5 text-white shadow-lg" aria-labelledby="investigator-title">
-      <div className="relative flex flex-col gap-4">
+    <section className="ai-panel-gradient relative min-w-0 rounded-xl p-5 text-white shadow-lg" aria-labelledby="investigator-title">
+      <div className="relative flex min-w-0 flex-col gap-4 break-words">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary-100" />
@@ -115,7 +115,7 @@ export default function AIInventoryInvestigator() {
               <p className="text-xs font-semibold text-white/90">Inventory analysis</p>
               <p className="text-[10px] text-white/60">{report.analyzedTransactions} transactions · {report.periodDays} days</p>
             </div>
-            <p className="whitespace-pre-line rounded-lg border border-white/10 bg-white/10 p-3 text-xs leading-relaxed text-white/90">{report.answer}</p>
+            <p tabIndex={0} className="max-h-72 overflow-y-auto whitespace-pre-line break-words rounded-lg border border-white/10 bg-white/10 p-3 text-xs leading-relaxed text-white/90">{report.answer}</p>
 
             {report.findings.length > 0 ? (
               <div className="mt-3 flex flex-col gap-2">
@@ -123,7 +123,7 @@ export default function AIInventoryInvestigator() {
                   <article key={finding.id} className="rounded-lg border border-white/10 bg-white/10 p-3">
                     <div className="flex items-start gap-2">
                       {finding.severity === "high" ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" /> : <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-100" />}
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs font-semibold text-white">{finding.title} · {finding.sku}</p>
                         <p className="mt-1 text-[11px] leading-relaxed text-white/75">{finding.evidence}</p>
                         <p className="mt-1 text-[11px] text-white/90">Next: {finding.recommendation}</p>

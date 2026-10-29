@@ -10,7 +10,6 @@ import {
   MapPin,
   Warehouse,
   BarChart3,
-  Sparkles,
   Settings,
 } from "lucide-react";
 import Logo from "@/components/shared/Logo";
@@ -51,7 +50,6 @@ const navSections: NavSection[] = [
     title: "Analytics",
     items: [
       { label: "Reports", href: "/reports", icon: BarChart3 },
-      { label: "AI Investigator", href: "/#investigator-title", icon: Sparkles, isAvailable: true },
     ],
   },
   {
@@ -113,7 +111,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <li key={item.href}>
                     <NavEntry
                       item={item}
-                      isActive={item.href === pathname || item.href.startsWith(`${pathname}#`)}
+                      isActive={item.href === pathname}
                       onNavigate={onClose}
                     />
                   </li>

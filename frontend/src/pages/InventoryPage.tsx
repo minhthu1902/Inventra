@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { ArrowDownToLine, CirclePlus, Pencil, Search, X } from "lucide-react";
 import {
   createInventoryItem,
@@ -55,9 +56,12 @@ export default function InventoryPage() {
   const [movementType, setMovementType] = useState<MovementType>("inbound");
   const [adjustmentDirection, setAdjustmentDirection] = useState<"increase" | "decrease">("increase");
   const [movementQuantity, setMovementQuantity] = useState(1);
-  const [searchInput, setSearchInput] = useState("");
+  const { hash } = useLocation();
+  const [searchParams] = useSearchParams();
+  const searchFromUrl = searchParams.get("search") ?? "";
+  const [searchInput, setSearchInput] = useState(searchFromUrl);
   const [scanCode, setScanCode] = useState("");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchFromUrl);
   const [stockStatus, setStockStatus] = useState<"all" | "low" | "out">("all");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
@@ -69,6 +73,27 @@ export default function InventoryPage() {
   const [notice, setNotice] = useState("");
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [queue, setQueue] = useState<{ pending: number; conflicts: number; items: QueuedMovement[] }>({ pending: 0, conflicts: 0, items: [] });
+
+  useEffect(() => {
+    setSearchInput(searchFromUrl);
+    setSearch(searchFromUrl);
+    setPage(1);
+  }, [searchFromUrl]);
+
+  useEffect(() => {
+    if (hash === "#add-item" && warehouses.length) {
+      document.getElementById("add-item")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [hash, warehouses.length]);
+
+  useEffect(() => {
+    if (!dialog) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDialog(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [dialog]);
 
   useEffect(() => {
     let active = true;
@@ -397,7 +422,7 @@ export default function InventoryPage() {
       )}
 
       {warehouses.length > 0 && (
-        <section className="border-y border-border py-5">
+        <section id="add-item" className="scroll-mt-4 border-y border-border py-5">
           <h2 className="mb-4 text-sm font-semibold text-text-primary">Add inventory item</h2>
           <form onSubmit={handleCreateItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Field label="SKU"><input required maxLength={64} value={draft.sku} onChange={(event) => updateDraft("sku", event.target.value)} placeholder="HEB-PRD-001" className={inputClass} /></Field>

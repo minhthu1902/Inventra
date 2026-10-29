@@ -1,16 +1,10 @@
-import { ChevronRight } from "lucide-react";
 import type { WarehouseUtilization } from "@/utils/InventoryApi";
 
 export default function WarehouseUtilizationCard({ warehouses }: { warehouses: WarehouseUtilization[] }) {
 
   return (
     <div className="rounded-xl border border-border bg-surface p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-primary">Warehouse Utilization</h3>
-        <button type="button" className="flex items-center text-xs font-medium text-primary-600 hover:underline">
-          View details <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <h3 className="mb-4 text-sm font-semibold text-text-primary">Warehouse Utilization</h3>
 
       <div className="flex flex-col gap-4">
         {warehouses.map((warehouse) => (

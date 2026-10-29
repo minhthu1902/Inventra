@@ -30,7 +30,7 @@ export default function Logo({ size = "md", showText = true, textClassName }: Lo
           <path d="M12 11V22" stroke="currentColor" strokeWidth="1.5" />
         </svg>
       </span>
-      {showText && <span className={`font-semibold text-white ${s.text} ${textClassName ?? ""}`}>Inventra</span>}
+      {showText && <span className={`font-semibold ${s.text} ${textClassName ?? "text-white"}`}>Inventra</span>}
     </div>
   );
 }
