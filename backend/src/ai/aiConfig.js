@@ -11,7 +11,7 @@ const providers = {
   gemini: {
     label: "Gemini",
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash-lite",
   },
 };
 

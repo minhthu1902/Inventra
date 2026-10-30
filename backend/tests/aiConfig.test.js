@@ -21,7 +21,7 @@ test("uses Gemini's OpenAI-compatible endpoint when Gemini is selected", () => {
   const { config } = resolveAiConfig({ AI_PROVIDER: "gemini", AI_API_KEY: "gemini-test" });
   assert.equal(config.label, "Gemini");
   assert.equal(config.apiKey, "gemini-test");
-  assert.equal(config.model, "gemini-2.5-flash");
+  assert.equal(config.model, "gemini-3.5-flash-lite");
   assert.equal(config.url, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
 });
 
