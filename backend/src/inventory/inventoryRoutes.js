@@ -5,6 +5,7 @@ import {
   createLocation,
   createStockMovement,
   createWarehouse,
+  deleteInventoryItem,
   getInventoryItem,
   listInventory,
   listTransactions,
@@ -26,6 +27,7 @@ router.get("/", listInventory);
 router.post("/", createInventoryItem);
 router.get("/:itemId", getInventoryItem);
 router.patch("/:itemId", updateInventoryItem);
+router.delete("/:itemId", deleteInventoryItem);
 router.post("/:itemId/transactions", createStockMovement);
 router.post("/:itemId/transfers", transferInventory);
 

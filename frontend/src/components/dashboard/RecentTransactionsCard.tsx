@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { FileClock, Search, ArrowDownToLine, ArrowUpFromLine, Repeat, SlidersHorizontal } from "lucide-react";
+import { Link } from "react-router-dom";
+import { FileClock, Search, ArrowDownToLine, ArrowUpFromLine, Repeat, SlidersHorizontal, ChevronRight } from "lucide-react";
 
 export type RecentTransaction = {
   id: string;
@@ -54,6 +55,9 @@ export default function RecentTransactionsCard({ transactions }: RecentTransacti
         <div className="flex items-center gap-2">
           <FileClock className="h-4 w-4 text-text-secondary" />
           <h3 className="text-sm font-semibold text-text-primary">Recent Transactions</h3>
+          <Link to="/transactions" className="ml-1 inline-flex items-center gap-0.5 text-xs font-medium text-primary-600 hover:text-primary-700">
+            View all <ChevronRight className="h-3 w-3" />
+          </Link>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="flex flex-wrap rounded-lg bg-background p-0.5 text-xs font-medium">

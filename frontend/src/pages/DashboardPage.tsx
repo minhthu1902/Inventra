@@ -10,6 +10,7 @@ import WarehouseUtilizationCard from "@/components/dashboard/WarehouseUtilizatio
 import WorkflowCard from "@/components/dashboard/WorkflowCard";
 import type { DashboardAlert } from "@/components/dashboard/AlertsCard";
 import type { RecentTransaction } from "@/components/dashboard/RecentTransactionsCard";
+import { buildWorkflowSteps } from "@/utils/dashboardData";
 import {
   getDashboardSummary,
   getInventoryTrend,
@@ -63,10 +64,10 @@ export default function Home() {
 
   const statCards = summary
     ? [
-        { id: "total-skus", label: "Total SKUs", value: summary.totalSkus.toLocaleString(), unit: "products", change: "Live", changeDirection: "up" as const, changeLabel: "from inventory", changeTone: "neutral" as const, icon: "box" as const, iconTone: "blue" as const },
-        { id: "low-stock", label: "Low Stock", value: summary.lowStockItems.toLocaleString(), unit: "items at/below reorder point", change: "Live", changeDirection: "up" as const, changeLabel: "from inventory", changeTone: summary.lowStockItems ? "negative" as const : "positive" as const, icon: "trendingDown" as const, iconTone: "green" as const },
-        { id: "inbound-today", label: "Inbound Today", value: summary.inboundToday.quantity.toLocaleString(), unit: `items / ${summary.inboundToday.transactions} transactions`, change: "Live", changeDirection: "up" as const, changeLabel: "today", changeTone: "neutral" as const, icon: "inbound" as const, iconTone: "purple" as const },
-        { id: "outbound-today", label: "Outbound Today", value: summary.outboundToday.quantity.toLocaleString(), unit: `items / ${summary.outboundToday.transactions} transactions`, change: "Live", changeDirection: "up" as const, changeLabel: "today", changeTone: "neutral" as const, icon: "outbound" as const, iconTone: "amber" as const },
+        { id: "total-skus", label: "Total SKUs", value: summary.totalSkus.toLocaleString(), unit: "products", change: "Live", changeDirection: "up" as const, changeLabel: "from inventory", changeTone: "neutral" as const, icon: "box" as const, iconTone: "blue" as const, href: "/inventory" },
+        { id: "low-stock", label: "Low Stock", value: summary.lowStockItems.toLocaleString(), unit: "items at/below reorder point", change: "Live", changeDirection: "up" as const, changeLabel: "from inventory", changeTone: summary.lowStockItems ? "negative" as const : "positive" as const, icon: "trendingDown" as const, iconTone: "green" as const, href: "/inventory?stockStatus=low" },
+        { id: "inbound-today", label: "Inbound Today", value: summary.inboundToday.quantity.toLocaleString(), unit: `items / ${summary.inboundToday.transactions} transactions`, change: "Live", changeDirection: "up" as const, changeLabel: "today", changeTone: "neutral" as const, icon: "inbound" as const, iconTone: "purple" as const, href: "/inbound" },
+        { id: "outbound-today", label: "Outbound Today", value: summary.outboundToday.quantity.toLocaleString(), unit: `items / ${summary.outboundToday.transactions} transactions`, change: "Live", changeDirection: "up" as const, changeLabel: "today", changeTone: "neutral" as const, icon: "outbound" as const, iconTone: "amber" as const, href: "/outbound" },
       ]
     : [];
 
@@ -76,6 +77,7 @@ export default function Home() {
     title: item.quantity === 0 ? "Out of stock" : "Low stock",
     description: `${item.sku} (${item.name}) · ${item.quantity} ${item.unit} remaining · ${item.warehouse}`,
     time: "Current",
+    href: `/inventory?search=${encodeURIComponent(item.sku)}`,
   })) ?? [];
 
   const transactions: RecentTransaction[] = summary?.recentTransactions.map((transaction) => {
@@ -85,7 +87,7 @@ export default function Home() {
       date: new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(transaction.createdAt)),
       type,
       reference: transaction.reference || "—",
-      item: transaction.item?.name ?? "Unknown item",
+      item: transaction.item?.name ?? "Removed item",
       quantity: `${type === "Outbound" || (type === "Adjustment" && transaction.adjustmentDirection === "decrease") ? "-" : type === "Transfer" ? "↔ " : "+"}${transaction.quantity}`,
       location: type === "Transfer"
         ? `${transaction.warehouse?.code ?? ""} ${transaction.location?.code ?? ""} → ${transaction.destinationWarehouse?.code ?? ""} ${transaction.destinationLocation ?? ""}`.trim()
@@ -125,7 +127,7 @@ export default function Home() {
 
       {summary && summary.totalSkus === 0 && (
         <p className="rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-text-primary" role="status">
-          No inventory items yet. Add inventory or run the synthetic demo seed to populate this dashboard.
+          No inventory items yet. Add items on the Inventory page, or load the synthetic demo data from the AI Inventory Investigator.
         </p>
       )}
 
@@ -153,7 +155,7 @@ export default function Home() {
         <WarehouseUtilizationCard warehouses={warehouses} />
       </div>
 
-      <WorkflowCard />
+      <WorkflowCard steps={buildWorkflowSteps(summary, warehouses.length)} />
     </div>
   );
 }

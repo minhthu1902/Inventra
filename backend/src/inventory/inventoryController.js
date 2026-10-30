@@ -219,6 +219,52 @@ export async function updateInventoryItem(request, response) {
   return response.status(200).json({ item });
 }
 
+export async function deleteInventoryItem(request, response) {
+  if (!mongoose.isValidObjectId(request.params.itemId)) {
+    return invalidReference(response, "Invalid inventory item id");
+  }
+  const ownerId = request.auth.userId;
+  const item = await InventoryItem.findOne({ _id: request.params.itemId, ownerId });
+  if (!item)
+    return response.status(404).json({ message: "Inventory item not found" });
+
+  // Write off remaining stock first so history and stock trends stay consistent
+  let writeOff = null;
+  if (item.quantity > 0) {
+    writeOff = await Transaction.create({
+      ownerId,
+      inventoryItemId: item._id,
+      warehouseId: item.warehouseId,
+      locationId: item.locationId,
+      type: "adjustment",
+      adjustmentDirection: "decrease",
+      quantity: item.quantity,
+      stockBefore: item.quantity,
+      stockAfter: 0,
+      reference: "ITEM-REMOVED",
+      note: `${item.sku} · ${item.name} removed from inventory`,
+      performedBy: ownerId,
+      dataSource: "user-entered",
+    });
+  }
+
+  const deleted = await InventoryItem.deleteOne({
+    _id: item._id,
+    ownerId,
+    quantity: item.quantity,
+  });
+  if (deleted.deletedCount === 0) {
+    if (writeOff) await Transaction.deleteOne({ _id: writeOff._id, ownerId });
+    return response.status(409).json({
+      message: "Stock changed while removing this item. Refresh and try again.",
+    });
+  }
+  return response.status(200).json({
+    deletedItemId: String(item._id),
+    removedQuantity: item.quantity,
+  });
+}
+
 export async function createStockMovement(request, response) {
   if (!mongoose.isValidObjectId(request.params.itemId)) {
     return invalidReference(response, "Invalid inventory item id");

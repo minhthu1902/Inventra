@@ -106,7 +106,10 @@ async function requestJson<T>(path: string, method = "GET", body?: unknown): Pro
 
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(result.message || `Request failed (${response.status})`);
+    const fieldErrors = Array.isArray(result.errors)
+      ? (result.errors as Array<{ path?: string; message?: string }>).map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message)).join("; ")
+      : "";
+    throw new Error(fieldErrors || result.message || `Request failed (${response.status})`);
   }
   return result as T;
 }
@@ -197,7 +200,7 @@ export async function getWarehouseLocations(warehouseId: string) {
   }
 }
 
-export function createWarehouse(data: { name: string; code: string; capacityUnits: number }) {
+export function createWarehouse(data: { name: string; code: string; address?: string; capacityUnits: number }) {
   return requestJson<{ warehouse: WarehouseRecord }>("/api/inventory/warehouses", "POST", data);
 }
 
@@ -237,4 +240,48 @@ export async function recordStockMovement(item: InventoryItem, data: MovementPay
   const operation = await enqueueStockMovement(ownerId, item, data);
   if (navigator.onLine) void syncQueuedMovements(ownerId);
   return operation;
+}
+
+export function deleteInventoryItem(itemId: string) {
+  return requestJson<{ deletedItemId: string; removedQuantity: number }>(`/api/inventory/${itemId}`, "DELETE");
+}
+
+export type TransactionType = "inbound" | "outbound" | "adjustment" | "transfer";
+
+export type TransactionRecord = {
+  _id: string;
+  type: TransactionType;
+  adjustmentDirection: "increase" | "decrease" | null;
+  quantity: number;
+  stockBefore: number;
+  stockAfter: number;
+  reference: string;
+  note: string;
+  createdAt: string;
+  inventoryItemId: { _id: string; sku: string; name: string; unit: string } | null;
+  warehouseId: { _id: string; name: string; code: string } | null;
+  locationId: { _id: string; code: string } | null;
+  destinationInventoryItemId: { _id: string; sku: string; name: string; unit: string } | null;
+  destinationWarehouseId: { _id: string; name: string; code: string } | null;
+  destinationLocationId: { _id: string; code: string } | null;
+};
+
+export function getTransactions(params: { type?: TransactionType; page?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.set(key, String(value));
+  }
+  return requestJson<{ transactions: TransactionRecord[]; pagination: { page: number; limit: number; total: number; pages: number } }>(`/api/inventory/transactions?${query}`);
+}
+
+export type InventoryReport = {
+  generatedAt: string;
+  totals: { items: number; units: number; value: number; lowStock: number; outOfStock: number };
+  warehouses: Array<{ id: string; name: string; code: string; items: number; units: number; value: number }>;
+  categories: Array<{ category: string; items: number; units: number; value: number }>;
+  movementsLast30Days: Array<{ type: TransactionType; quantity: number; transactions: number }>;
+};
+
+export function getInventoryReport() {
+  return requestJson<InventoryReport>("/api/dashboard/report");
 }

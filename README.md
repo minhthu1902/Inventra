@@ -21,6 +21,17 @@ Open [Inventra](https://136.80.5.76/), register an account, and verify it with t
 
 The OpenAI key is configured only in the backend environment; it is not a frontend setting.
 
+## Inventory Management
+
+- **Items:** add, edit, and remove items. Forms validate SKUs, codes, quantities, prices (up to 2 decimals), and expiry dates before anything is sent. Removing an item that still has stock writes the remaining units off with an `ITEM-REMOVED` adjustment, so totals and history stay accurate.
+- **Stock movements:** receive, ship, transfer between warehouses, and adjust counts. Dashboard Quick Actions open the inventory with the chosen movement preselected.
+- **History:** Inbound, Outbound, Transfers, Adjustments, and an all-movements view, each paginated.
+- **Warehouses and locations:** create warehouses with capacity, see how full each one is, and add storage locations to them.
+- **Reports:** inventory value by warehouse and category, the last 30 days of movement, and a CSV export of every item.
+- **Settings:** account details, offline cache and sync status for this device, and sign-out.
+
+`GET /api/health` reports whether the database is connected. If MongoDB is unreachable, the API keeps running, retries the connection, and answers with `503` instead of exiting.
+
 ## AI Inventory Investigator
 
 Inventra's AI Inventory Investigator is available through the authenticated `POST /api/ai/investigator` API. It reviews current quantities and recent transactions to highlight unusually large stock reductions, repeated outbound activity, outbound spikes, and items at or below their reorder points. Each finding includes its supporting quantities and a practical next step. `POST /api/ai/demo-data` adds a small synthetic dataset to an empty account so reviewers can try the feature.

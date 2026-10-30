@@ -1,4 +1,5 @@
-import { Box, TrendingDown, ArrowDownToLine, ArrowUpFromLine, ArrowUp } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Box, TrendingDown, ArrowDownToLine, ArrowUpFromLine, ChevronRight } from "lucide-react";
 import type { StatCard } from "@/utils/dashboardData";
 
 const iconMap = {
@@ -24,8 +25,8 @@ export default function StatCardItem({ stat }: { stat: StatCard }) {
         ? "text-danger"
         : "text-text-secondary";
 
-  return (
-    <div className="flex flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+  const content = (
+    <>
       <div className="flex items-center gap-2">
         <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneMap[stat.iconTone]}`}>
           <Icon className="h-4 w-4" />
@@ -36,11 +37,25 @@ export default function StatCardItem({ stat }: { stat: StatCard }) {
         <p className="text-2xl font-semibold text-text-primary">{stat.value}</p>
         <p className="text-xs text-text-secondary">{stat.unit}</p>
       </div>
-      <div className={`flex items-center gap-1 text-xs font-medium ${changeColor}`}>
-        <ArrowUp className="h-3 w-3" />
-        <span>{stat.change}</span>
-        <span className="text-text-secondary">{stat.changeLabel}</span>
+      <div className="flex items-center justify-between gap-2 text-xs font-medium">
+        <span className={changeColor}>
+          {stat.change} <span className="text-text-secondary">{stat.changeLabel}</span>
+        </span>
+        {stat.href && (
+          <span className="flex items-center gap-0.5 text-primary-600">
+            View <ChevronRight className="h-3 w-3" />
+          </span>
+        )}
       </div>
-    </div>
+    </>
+  );
+
+  const className = "flex flex-1 flex-col gap-3 rounded-xl border border-border bg-surface p-4";
+  return stat.href ? (
+    <Link to={stat.href} className={`${className} hover:border-primary-400 hover:shadow-sm`}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }

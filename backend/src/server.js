@@ -1,13 +1,13 @@
 import { app } from "./app.js";
 import { env } from "./config/env.js";
-import { connectDatabase } from "./db/connect.js";
+import { connectDatabaseWithRetry } from "./db/connect.js";
 import mongoose from "mongoose";
 
 async function startServer() {
-  await connectDatabase();
   const server = app.listen(env.PORT, () => {
     console.info(`Inventra API listening on http://localhost:${env.PORT}`);
   });
+  void connectDatabaseWithRetry();
 
   const shutdown = (signal) => {
     console.info(`${signal} received; closing API server`);

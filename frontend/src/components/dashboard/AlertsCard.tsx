@@ -1,4 +1,5 @@
-import { AlertTriangle, AlertCircle, Info } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, AlertCircle, Info, ChevronRight } from "lucide-react";
 
 export type DashboardAlert = {
   id: string;
@@ -6,6 +7,7 @@ export type DashboardAlert = {
   title: string;
   description: string;
   time: string;
+  href?: string;
 };
 
 const severityConfig = {
@@ -27,16 +29,9 @@ export default function AlertsCard({ alerts }: { alerts: DashboardAlert[] }) {
 
       <ul className="flex flex-col gap-2">
         {alerts.map((alert) => {
-          const config = severityConfig[alert.severity];
-          const Icon = config.icon;
           return (
-            <li key={alert.id} className={`flex items-start gap-3 rounded-lg ${config.bg} p-3`}>
-              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${config.text}`} />
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium ${config.text}`}>{alert.title}</p>
-                <p className="truncate text-xs text-text-secondary">{alert.description}</p>
-              </div>
-              <span className="shrink-0 text-[11px] text-text-secondary">{alert.time}</span>
+            <li key={alert.id}>
+              <AlertBody alert={alert} />
             </li>
           );
         })}
@@ -45,5 +40,31 @@ export default function AlertsCard({ alerts }: { alerts: DashboardAlert[] }) {
         )}
       </ul>
     </div>
+  );
+}
+
+function AlertBody({ alert }: { alert: DashboardAlert }) {
+  const config = severityConfig[alert.severity];
+  const Icon = config.icon;
+  const content = (
+    <>
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${config.text}`} />
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-medium ${config.text}`}>{alert.title}</p>
+        <p className="truncate text-xs text-text-secondary">{alert.description}</p>
+      </div>
+      <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-text-secondary">
+        {alert.time}
+        {alert.href && <ChevronRight className="h-3 w-3" />}
+      </span>
+    </>
+  );
+  const className = `flex items-start gap-3 rounded-lg ${config.bg} p-3`;
+  return alert.href ? (
+    <Link to={alert.href} className={`${className} hover:ring-1 hover:ring-border`} aria-label={`${alert.title}: ${alert.description}. Open in inventory`}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }

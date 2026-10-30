@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { ArrowDownToLine, CirclePlus, Pencil, Search, X } from "lucide-react";
+import { ArrowDownToLine, CirclePlus, Pencil, Search, Trash2, X } from "lucide-react";
 import {
   createInventoryItem,
   createLocation,
+  deleteInventoryItem,
   recordStockMovement,
   createWarehouse,
   getInventory,
@@ -23,6 +24,8 @@ import {
   syncQueuedMovements,
   type QueuedMovement,
 } from "@/utils/OfflineInventory";
+import { Field, inputClass } from "@/components/shared/FormField";
+import { hasErrors, validateItemDraft, validateItemUpdate, validateMovement, type FieldErrors } from "@/utils/inventoryValidation";
 
 const emptyDraft = {
   sku: "",
@@ -41,8 +44,22 @@ const emptyDraft = {
 };
 
 type ItemDraft = typeof emptyDraft;
-type DialogState = { type: "edit" | "movement"; item: InventoryItem } | null;
+type DialogState = { type: "edit" | "movement" | "delete"; item: InventoryItem } | null;
 type MovementType = "inbound" | "outbound" | "adjustment" | "transfer";
+
+const quickMovementLabels: Partial<Record<MovementType, string>> = {
+  inbound: "receive stock",
+  outbound: "ship stock",
+  transfer: "transfer stock",
+};
+
+function parseMovementParam(value: string | null): MovementType | null {
+  return value === "inbound" || value === "outbound" || value === "transfer" ? value : null;
+}
+
+function parseStockStatusParam(value: string | null): "all" | "low" | "out" {
+  return value === "low" || value === "out" ? value : "all";
+}
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -57,12 +74,16 @@ export default function InventoryPage() {
   const [adjustmentDirection, setAdjustmentDirection] = useState<"increase" | "decrease">("increase");
   const [movementQuantity, setMovementQuantity] = useState(1);
   const { hash } = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchFromUrl = searchParams.get("search") ?? "";
+  const stockStatusFromUrl = parseStockStatusParam(searchParams.get("stockStatus"));
+  const quickMovement = parseMovementParam(searchParams.get("movement"));
   const [searchInput, setSearchInput] = useState(searchFromUrl);
   const [scanCode, setScanCode] = useState("");
   const [search, setSearch] = useState(searchFromUrl);
-  const [stockStatus, setStockStatus] = useState<"all" | "low" | "out">("all");
+  const [stockStatus, setStockStatus] = useState<"all" | "low" | "out">(stockStatusFromUrl);
+  const [draftErrors, setDraftErrors] = useState<FieldErrors>({});
+  const [dialogErrors, setDialogErrors] = useState<FieldErrors>({});
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
   const [total, setTotal] = useState(0);
@@ -79,6 +100,15 @@ export default function InventoryPage() {
     setSearch(searchFromUrl);
     setPage(1);
   }, [searchFromUrl]);
+
+  useEffect(() => {
+    setStockStatus(stockStatusFromUrl);
+    setPage(1);
+  }, [stockStatusFromUrl]);
+
+  useEffect(() => {
+    setDialogErrors({});
+  }, [dialog]);
 
   useEffect(() => {
     if (hash === "#add-item" && warehouses.length) {
@@ -198,6 +228,7 @@ export default function InventoryPage() {
 
   function updateDraft<K extends keyof ItemDraft>(field: K, value: ItemDraft[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
+    setDraftErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
   }
 
   async function handleCreateWarehouse() {
@@ -229,9 +260,12 @@ export default function InventoryPage() {
 
   async function handleCreateItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
     setError("");
     setNotice("");
+    const errors = validateItemDraft(draft);
+    setDraftErrors(errors);
+    if (hasErrors(errors)) return;
+    setIsSaving(true);
     try {
       await createInventoryItem({
         warehouseId: draft.warehouseId,
@@ -262,19 +296,26 @@ export default function InventoryPage() {
     event.preventDefault();
     if (!dialog || dialog.type !== "edit") return;
     const formData = new FormData(event.currentTarget);
+    const update = {
+      name: String(formData.get("name") ?? "").trim(),
+      barcode: String(formData.get("barcode") ?? "").trim(),
+      category: String(formData.get("category") ?? "").trim(),
+      unit: String(formData.get("unit") ?? "").trim(),
+      reorderPoint: Number(formData.get("reorderPoint")),
+      unitCost: Number(formData.get("unitCost")),
+      isPerishable: formData.get("isPerishable") === "on",
+      batchNumber: String(formData.get("batchNumber") ?? "").trim(),
+      expiryDate: String(formData.get("expiryDate") ?? ""),
+    };
+    const errors = validateItemUpdate(update);
+    setDialogErrors(errors);
+    if (hasErrors(errors)) return;
     setIsSaving(true);
     setError("");
     try {
       await updateInventoryItem(dialog.item._id, {
-        name: String(formData.get("name")),
-        barcode: String(formData.get("barcode")),
-        category: String(formData.get("category")),
-        unit: String(formData.get("unit")),
-        reorderPoint: Number(formData.get("reorderPoint")),
-        unitCost: Number(formData.get("unitCost")),
-        isPerishable: formData.get("isPerishable") === "on",
-        batchNumber: String(formData.get("batchNumber")),
-        expiryDate: formData.get("expiryDate") ? new Date(String(formData.get("expiryDate"))).toISOString() : null,
+        ...update,
+        expiryDate: update.expiryDate ? new Date(update.expiryDate).toISOString() : null,
       });
       setDialog(null);
       setNotice("Inventory item updated.");
@@ -289,22 +330,33 @@ export default function InventoryPage() {
   async function handleMovement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!dialog || dialog.type !== "movement") return;
+    const formData = new FormData(event.currentTarget);
+    const type = String(formData.get("type")) as MovementType;
+    const common = {
+      quantity: Number(formData.get("quantity")),
+      reference: String(formData.get("reference") ?? "").trim(),
+      note: String(formData.get("note") ?? "").trim(),
+    };
+    const destinationItem = items.find((item) => item.sku === dialog.item.sku && item.warehouseId?._id === destinationWarehouseId);
+    const resolvedDestinationLocationId = destinationItem?.locationId?._id ?? destinationLocationId;
+    const errors = validateMovement({
+      type,
+      direction: type === "adjustment" ? adjustmentDirection : undefined,
+      currentStock: dialog.item.quantity,
+      destinationWarehouseId,
+      destinationLocationId: resolvedDestinationLocationId,
+      ...common,
+    });
+    setDialogErrors(errors);
+    if (hasErrors(errors)) return;
     setIsSaving(true);
     setError("");
     try {
-      const formData = new FormData(event.currentTarget);
-      const type = String(formData.get("type")) as MovementType;
-      const common = {
-        quantity: Number(formData.get("quantity")),
-        reference: String(formData.get("reference")),
-        note: String(formData.get("note")),
-      };
       if (type === "transfer") {
-        const destinationItem = items.find((item) => item.sku === dialog.item.sku && item.warehouseId?._id === destinationWarehouseId);
         await recordStockMovement(dialog.item, {
           type,
           destinationWarehouseId,
-          destinationLocationId: destinationItem?.locationId?._id ?? destinationLocationId,
+          destinationLocationId: resolvedDestinationLocationId,
           ...common,
         });
       } else if (type === "adjustment") {
@@ -326,11 +378,41 @@ export default function InventoryPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!dialog || dialog.type !== "delete") return;
+    const { item } = dialog;
+    setIsSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await deleteInventoryItem(item._id);
+      setDialog(null);
+      setNotice(
+        result.removedQuantity > 0
+          ? `${item.sku} removed. ${result.removedQuantity} ${item.unit} were written off and recorded in the transaction history.`
+          : `${item.sku} removed from inventory.`,
+      );
+      setReloadKey((key) => key + 1);
+    } catch (requestError) {
+      setDialogErrors({ form: requestError instanceof Error ? requestError.message : "Unable to remove this item." });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   function openMovement(item: InventoryItem) {
-    setMovementType("inbound");
+    setMovementType(quickMovement ?? "inbound");
     setMovementQuantity(1);
     setDestinationWarehouseId(warehouses.find((warehouse) => warehouse._id !== item.warehouseId?._id)?._id ?? "");
     setDialog({ type: "movement", item });
+  }
+
+  function clearQuickMovement() {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("movement");
+      return next;
+    }, { replace: true });
   }
 
   const pendingItemIds = useMemo(
@@ -365,9 +447,7 @@ export default function InventoryPage() {
       return;
     }
     setError("");
-    setMovementType("inbound");
-    setMovementQuantity(1);
-    setDialog({ type: "movement", item });
+    openMovement(item);
     setScanCode("");
   }
 
@@ -409,6 +489,18 @@ export default function InventoryPage() {
         </aside>
       )}
 
+      {quickMovement && (
+        <aside className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary-400/40 bg-primary-50 px-4 py-3" role="status">
+          <p className="text-sm text-text-primary">
+            <span className="font-semibold">Choose an item to {quickMovementLabels[quickMovement]}.</span>{" "}
+            <span className="text-text-secondary">Select “Stock movement” on any item below, or scan its barcode.</span>
+          </p>
+          <button type="button" onClick={clearQuickMovement} className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-background">
+            Cancel
+          </button>
+        </aside>
+      )}
+
       {warehouses.length === 0 && !isLoading && (
         <section className="flex flex-wrap items-center justify-between gap-4 border-y border-border py-5">
           <div>
@@ -424,19 +516,19 @@ export default function InventoryPage() {
       {warehouses.length > 0 && (
         <section id="add-item" className="scroll-mt-4 border-y border-border py-5">
           <h2 className="mb-4 text-sm font-semibold text-text-primary">Add inventory item</h2>
-          <form onSubmit={handleCreateItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Field label="SKU"><input required maxLength={64} value={draft.sku} onChange={(event) => updateDraft("sku", event.target.value)} placeholder="HEB-PRD-001" className={inputClass} /></Field>
-            <Field label="Barcode (optional)"><input maxLength={80} value={draft.barcode} onChange={(event) => updateDraft("barcode", event.target.value)} placeholder="Scan barcode or enter it" className={inputClass} /></Field>
-            <Field label="Product name"><input required maxLength={160} value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="Product name" className={inputClass} /></Field>
-            <Field label="Category"><input value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} placeholder="Produce" className={inputClass} /></Field>
-            <Field label="Unit"><input value={draft.unit} onChange={(event) => updateDraft("unit", event.target.value)} placeholder="each, case, lb" className={inputClass} /></Field>
-            <Field label="Opening quantity"><input required type="number" min="0" step="any" value={draft.quantity} onChange={(event) => updateDraft("quantity", Number(event.target.value))} className={inputClass} /></Field>
-            <Field label="Reorder point"><input required type="number" min="0" step="any" value={draft.reorderPoint} onChange={(event) => updateDraft("reorderPoint", Number(event.target.value))} className={inputClass} /></Field>
-            <Field label="Unit cost (USD)"><input required type="number" min="0" step="0.01" value={draft.unitCost} onChange={(event) => updateDraft("unitCost", Number(event.target.value))} className={inputClass} /></Field>
-            <Field label="Warehouse"><select required value={draft.warehouseId} onChange={(event) => { updateDraft("warehouseId", event.target.value); updateDraft("locationId", ""); }} className={inputClass}>{warehouses.map((warehouse) => <option key={warehouse._id} value={warehouse._id}>{warehouse.name} ({warehouse.code})</option>)}</select></Field>
-            <Field label="Location"><select required value={draft.locationId} onChange={(event) => updateDraft("locationId", event.target.value)} className={inputClass}>{locations.map((location) => <option key={location._id} value={location._id}>{location.code} {location.zone}</option>)}</select></Field>
-            <Field label="Batch number"><input value={draft.batchNumber} onChange={(event) => updateDraft("batchNumber", event.target.value)} placeholder="Optional" className={inputClass} /></Field>
-            <Field label="Expiry date"><input type="date" value={draft.expiryDate} onChange={(event) => updateDraft("expiryDate", event.target.value)} className={inputClass} /></Field>
+          <form noValidate onSubmit={handleCreateItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Field error={draftErrors.sku} label="SKU"><input required maxLength={64} value={draft.sku} onChange={(event) => updateDraft("sku", event.target.value)} placeholder="HEB-PRD-001" className={inputClass} /></Field>
+            <Field error={draftErrors.barcode} label="Barcode (optional)"><input maxLength={80} value={draft.barcode} onChange={(event) => updateDraft("barcode", event.target.value)} placeholder="Scan barcode or enter it" className={inputClass} /></Field>
+            <Field error={draftErrors.name} label="Product name"><input required maxLength={160} value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="Product name" className={inputClass} /></Field>
+            <Field error={draftErrors.category} label="Category"><input value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} placeholder="Produce" className={inputClass} /></Field>
+            <Field error={draftErrors.unit} label="Unit"><input value={draft.unit} onChange={(event) => updateDraft("unit", event.target.value)} placeholder="each, case, lb" className={inputClass} /></Field>
+            <Field error={draftErrors.quantity} label="Opening quantity"><input required type="number" min="0" step="any" value={draft.quantity} onChange={(event) => updateDraft("quantity", Number(event.target.value))} className={inputClass} /></Field>
+            <Field error={draftErrors.reorderPoint} label="Reorder point"><input required type="number" min="0" step="any" value={draft.reorderPoint} onChange={(event) => updateDraft("reorderPoint", Number(event.target.value))} className={inputClass} /></Field>
+            <Field error={draftErrors.unitCost} label="Unit cost (USD)"><input required type="number" min="0" step="0.01" value={draft.unitCost} onChange={(event) => updateDraft("unitCost", Number(event.target.value))} className={inputClass} /></Field>
+            <Field error={draftErrors.warehouseId} label="Warehouse"><select required value={draft.warehouseId} onChange={(event) => { updateDraft("warehouseId", event.target.value); updateDraft("locationId", ""); }} className={inputClass}>{warehouses.map((warehouse) => <option key={warehouse._id} value={warehouse._id}>{warehouse.name} ({warehouse.code})</option>)}</select></Field>
+            <Field error={draftErrors.locationId} label="Location"><select required value={draft.locationId} onChange={(event) => updateDraft("locationId", event.target.value)} className={inputClass}>{locations.map((location) => <option key={location._id} value={location._id}>{location.code} {location.zone}</option>)}</select></Field>
+            <Field error={draftErrors.batchNumber} label="Batch number"><input value={draft.batchNumber} onChange={(event) => updateDraft("batchNumber", event.target.value)} placeholder="Optional" className={inputClass} /></Field>
+            <Field error={draftErrors.expiryDate} label="Expiry date"><input type="date" value={draft.expiryDate} onChange={(event) => updateDraft("expiryDate", event.target.value)} className={inputClass} /></Field>
             <div className="flex items-end gap-3">
               <label className="flex h-10 items-center gap-2 text-sm text-text-secondary"><input type="checkbox" checked={draft.isPerishable} onChange={(event) => updateDraft("isPerishable", event.target.checked)} /> Perishable</label>
               <button type="submit" disabled={isSaving || !draft.locationId} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60"><CirclePlus className="h-4 w-4" /> Add item</button>
@@ -462,10 +554,10 @@ export default function InventoryPage() {
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead><tr className="border-b border-border text-xs text-text-secondary"><th className="py-3 pr-4 font-medium">SKU / Item</th><th className="py-3 pr-4 font-medium">Category</th><th className="py-3 pr-4 font-medium">Location</th><th className="py-3 pr-4 font-medium">On hand</th><th className="py-3 pr-4 font-medium">Reorder at</th><th className="py-3 pr-4 font-medium">Unit cost</th><th className="py-3 font-medium">Actions</th></tr></thead>
-                <tbody>{items.map((item) => <InventoryTableRow key={item._id} item={item} isPending={pendingItemIds.has(item._id)} onEdit={() => setDialog({ type: "edit", item })} onMovement={() => openMovement(item)} />)}</tbody>
+                <tbody>{items.map((item) => <InventoryTableRow key={item._id} item={item} isPending={pendingItemIds.has(item._id)} onEdit={() => setDialog({ type: "edit", item })} onMovement={() => openMovement(item)} onDelete={() => setDialog({ type: "delete", item })} />)}</tbody>
               </table>
             </div>
-            <ul className="divide-y divide-border md:hidden">{items.map((item) => <InventoryMobileRow key={item._id} item={item} isPending={pendingItemIds.has(item._id)} onEdit={() => setDialog({ type: "edit", item })} onMovement={() => openMovement(item)} />)}</ul>
+            <ul className="divide-y divide-border md:hidden">{items.map((item) => <InventoryMobileRow key={item._id} item={item} isPending={pendingItemIds.has(item._id)} onEdit={() => setDialog({ type: "edit", item })} onMovement={() => openMovement(item)} onDelete={() => setDialog({ type: "delete", item })} />)}</ul>
             <div className="flex items-center justify-between border-t border-border pt-3 text-sm text-text-secondary">
               <span>Page {page} of {Math.max(pages, 1)}</span>
               <div className="flex gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded-md border border-border px-3 py-1.5 disabled:opacity-40">Previous</button><button type="button" disabled={page >= pages} onClick={() => setPage((current) => current + 1)} className="rounded-md border border-border px-3 py-1.5 disabled:opacity-40">Next</button></div>
@@ -478,34 +570,57 @@ export default function InventoryPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-primary-900/50 p-4 pt-12" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null); }}>
           <section className="w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="inventory-dialog-title">
             <div className="mb-5 flex items-start justify-between gap-4">
-              <div><h2 id="inventory-dialog-title" className="font-semibold text-text-primary">{dialog.type === "edit" ? "Edit inventory item" : "Record stock movement"}</h2><p className="mt-1 text-sm text-text-secondary">{dialog.item.sku} · {dialog.item.name}</p></div>
-              <button type="button" onClick={() => setDialog(null)} aria-label="Close dialog" className="flex h-8 w-8 items-center justify-center rounded-md text-text-secondary hover:bg-background"><X className="h-4 w-4" /></button>
+              <div className="min-w-0"><h2 id="inventory-dialog-title" className="font-semibold text-text-primary">{dialog.type === "edit" ? "Edit inventory item" : dialog.type === "delete" ? "Remove inventory item" : "Record stock movement"}</h2><p className="mt-1 break-words text-sm text-text-secondary">{dialog.item.sku} · {dialog.item.name}</p></div>
+              <button type="button" onClick={() => setDialog(null)} aria-label="Close dialog" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-background"><X className="h-4 w-4" /></button>
             </div>
-            {dialog.type === "edit" ? (
-              <form onSubmit={handleUpdateItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Product name"><input name="name" required defaultValue={dialog.item.name} className={inputClass} /></Field>
-                <Field label="Barcode"><input name="barcode" defaultValue={dialog.item.barcode ?? ""} className={inputClass} /></Field>
-                <Field label="Category"><input name="category" defaultValue={dialog.item.category} className={inputClass} /></Field>
-                <Field label="Unit"><input name="unit" defaultValue={dialog.item.unit} className={inputClass} /></Field>
-                <Field label="Reorder point"><input name="reorderPoint" type="number" min="0" step="any" defaultValue={dialog.item.reorderPoint} className={inputClass} /></Field>
-                <Field label="Unit cost"><input name="unitCost" type="number" min="0" step="0.01" defaultValue={dialog.item.unitCost} className={inputClass} /></Field>
-                <Field label="Expiry date"><input name="expiryDate" type="date" defaultValue={dialog.item.expiryDate?.slice(0, 10) ?? ""} className={inputClass} /></Field>
-                <Field label="Batch number"><input name="batchNumber" defaultValue={dialog.item.batchNumber} className={inputClass} /></Field>
+            {dialogErrors.form && <p className="mb-4 rounded-md border border-danger/20 bg-danger-bg px-3 py-2 text-sm text-danger" role="alert">{dialogErrors.form}</p>}
+            {dialog.type === "delete" ? (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-text-primary">
+                  {dialog.item.quantity > 0
+                    ? <>This item still has <strong>{dialog.item.quantity} {dialog.item.unit}</strong> on hand. Removing it writes that stock off with an adjustment so your history and totals stay accurate.</>
+                    : <>This item has no stock on hand.</>}
+                </p>
+                <p className="text-sm text-text-secondary">Past transactions are kept for your records. This cannot be undone.</p>
+                {(isOffline || pendingItemIds.has(dialog.item._id)) && (
+                  <p className="rounded-md border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-text-primary">
+                    {isOffline ? "Reconnect to remove items. Removal needs the server." : "This item has movements waiting to sync. Sync them before removing the item."}
+                  </p>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setDialog(null)} className="rounded-md border border-border px-4 py-2 text-sm">Cancel</button>
+                  <button type="button" onClick={() => void handleDelete()} disabled={isSaving || isOffline || pendingItemIds.has(dialog.item._id)} className="inline-flex items-center gap-2 rounded-md bg-danger px-4 py-2 text-sm font-semibold text-white hover:bg-danger/90 disabled:opacity-60"><Trash2 className="h-4 w-4" /> Remove item</button>
+                </div>
+              </div>
+            ) : dialog.type === "edit" ? (
+              <form noValidate onSubmit={handleUpdateItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field error={dialogErrors.name} label="Product name"><input name="name" required maxLength={160} defaultValue={dialog.item.name} className={inputClass} /></Field>
+                <Field error={dialogErrors.barcode} label="Barcode"><input name="barcode" maxLength={80} defaultValue={dialog.item.barcode ?? ""} className={inputClass} /></Field>
+                <Field error={dialogErrors.category} label="Category"><input name="category" maxLength={80} defaultValue={dialog.item.category} className={inputClass} /></Field>
+                <Field error={dialogErrors.unit} label="Unit"><input name="unit" required maxLength={24} defaultValue={dialog.item.unit} className={inputClass} /></Field>
+                <Field error={dialogErrors.reorderPoint} label="Reorder point"><input name="reorderPoint" type="number" min="0" step="any" defaultValue={dialog.item.reorderPoint} className={inputClass} /></Field>
+                <Field error={dialogErrors.unitCost} label="Unit cost"><input name="unitCost" type="number" min="0" step="0.01" defaultValue={dialog.item.unitCost} className={inputClass} /></Field>
+                <Field error={dialogErrors.expiryDate} label="Expiry date"><input name="expiryDate" type="date" defaultValue={dialog.item.expiryDate?.slice(0, 10) ?? ""} className={inputClass} /></Field>
+                <Field error={dialogErrors.batchNumber} label="Batch number"><input name="batchNumber" maxLength={80} defaultValue={dialog.item.batchNumber} className={inputClass} /></Field>
                 <label className="flex items-center gap-2 text-sm text-text-secondary"><input name="isPerishable" type="checkbox" defaultChecked={dialog.item.isPerishable} /> Perishable</label>
-                <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => setDialog(null)} className="rounded-md border border-border px-4 py-2 text-sm">Cancel</button><button disabled={isSaving} className="rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">Save</button></div>
+                <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
+                  <button type="button" onClick={() => setDialog({ type: "delete", item: dialog.item })} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-danger hover:bg-danger-bg"><Trash2 className="h-4 w-4" /> Remove item</button>
+                  <div className="flex gap-2"><button type="button" onClick={() => setDialog(null)} className="rounded-md border border-border px-4 py-2 text-sm">Cancel</button><button disabled={isSaving} className="rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">Save</button></div>
+                </div>
               </form>
             ) : (
-              <form onSubmit={handleMovement} className="grid grid-cols-1 gap-3">
-                <Field label="Movement type"><select name="type" value={movementType} onChange={(event) => setMovementType(event.target.value as MovementType)} className={inputClass}><option value="inbound">Receive inventory</option><option value="outbound">Issue inventory</option><option value="transfer">Transfer inventory</option><option value="adjustment">Adjust count</option></select></Field>
+              <form noValidate onSubmit={handleMovement} className="grid grid-cols-1 gap-3">
+                <Field label="Movement type"><select name="type" value={movementType} onChange={(event) => { setMovementType(event.target.value as MovementType); setDialogErrors({}); }} className={inputClass}><option value="inbound">Receive inventory</option><option value="outbound">Issue inventory</option><option value="transfer">Transfer inventory</option><option value="adjustment">Adjust count</option></select></Field>
                 {movementType === "adjustment" && <Field label="Adjustment direction"><select name="direction" value={adjustmentDirection} onChange={(event) => setAdjustmentDirection(event.target.value as typeof adjustmentDirection)} className={inputClass}><option value="increase">Increase</option><option value="decrease">Decrease</option></select></Field>}
                 {movementType === "transfer" && <>
-                  <Field label="Destination warehouse"><select required value={destinationWarehouseId} onChange={(event) => setDestinationWarehouseId(event.target.value)} className={inputClass}><option value="">Choose warehouse</option>{warehouses.filter((warehouse) => warehouse._id !== dialog.item.warehouseId?._id).map((warehouse) => <option key={warehouse._id} value={warehouse._id}>{warehouse.name} ({warehouse.code})</option>)}</select></Field>
-                  <Field label="Destination location"><select required value={destinationLocationId} onChange={(event) => setDestinationLocationId(event.target.value)} className={inputClass}><option value="">Choose location</option>{transferLocations.map((location) => <option key={location._id} value={location._id}>{location.code} {location.zone}</option>)}</select></Field>
+                  {warehouses.length < 2 && <p className="rounded-md border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-text-primary">Transfers need a second warehouse. Add one on the Warehouses page first.</p>}
+                  <Field error={dialogErrors.destinationWarehouseId} label="Destination warehouse"><select required value={destinationWarehouseId} onChange={(event) => setDestinationWarehouseId(event.target.value)} className={inputClass}><option value="">Choose warehouse</option>{warehouses.filter((warehouse) => warehouse._id !== dialog.item.warehouseId?._id).map((warehouse) => <option key={warehouse._id} value={warehouse._id}>{warehouse.name} ({warehouse.code})</option>)}</select></Field>
+                  <Field error={dialogErrors.destinationLocationId} label="Destination location"><select required value={destinationLocationId} onChange={(event) => setDestinationLocationId(event.target.value)} className={inputClass}><option value="">Choose location</option>{transferLocations.map((location) => <option key={location._id} value={location._id}>{location.code} {location.zone}</option>)}</select></Field>
                   <p className="text-xs text-text-secondary sm:col-span-2">Inventra will create the SKU at the destination warehouse if it does not exist there yet.</p>
                 </>}
-                <Field label="Quantity"><input name="quantity" type="number" min="0.01" step="any" required value={movementQuantity} onChange={(event) => setMovementQuantity(Number(event.target.value))} className={inputClass} /></Field>
-                <Field label="Reference"><input name="reference" placeholder="Optional PO / shipment reference" className={inputClass} /></Field>
-                <Field label="Note"><input name="note" placeholder="Optional note" className={inputClass} /></Field>
+                <Field error={dialogErrors.quantity} label="Quantity"><input name="quantity" type="number" min="0.01" step="any" required value={movementQuantity} onChange={(event) => { setMovementQuantity(Number(event.target.value)); setDialogErrors((current) => ({ ...current, quantity: undefined })); }} className={inputClass} /></Field>
+                <Field error={dialogErrors.reference} label="Reference"><input name="reference" maxLength={80} placeholder="Optional PO / shipment reference" className={inputClass} /></Field>
+                <Field error={dialogErrors.note} label="Note"><input name="note" maxLength={500} placeholder="Optional note" className={inputClass} /></Field>
                 <p className="text-xs text-text-secondary">Current stock: {dialog.item.quantity} {dialog.item.unit}</p>
                 <div className="flex justify-end gap-2"><button type="button" onClick={() => setDialog(null)} className="rounded-md border border-border px-4 py-2 text-sm">Cancel</button><button disabled={isSaving} className="rounded-md bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">Record movement</button></div>
               </form>
@@ -517,13 +632,7 @@ export default function InventoryPage() {
   );
 }
 
-const inputClass = "h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-text-secondary">{label}{children}</label>;
-}
-
-function InventoryTableRow({ item, isPending, onEdit, onMovement }: { item: InventoryItem; isPending: boolean; onEdit: () => void; onMovement: () => void }) {
+function InventoryTableRow({ item, isPending, onEdit, onMovement, onDelete }: { item: InventoryItem; isPending: boolean; onEdit: () => void; onMovement: () => void; onDelete: () => void }) {
   const isLow = item.quantity <= item.reorderPoint;
   return (
     <tr className="border-b border-border text-text-secondary">
@@ -531,18 +640,18 @@ function InventoryTableRow({ item, isPending, onEdit, onMovement }: { item: Inve
       <td className="py-3 pr-4">{item.category}</td><td className="py-3 pr-4">{item.locationId?.code ?? "—"}</td>
       <td className={`py-3 pr-4 font-semibold ${isLow ? "text-danger" : "text-text-primary"}`}>{item.quantity} {item.unit}{isPending && <span className="mt-1 block text-[10px] font-medium text-warning">Pending sync</span>}</td>
       <td className="py-3 pr-4">{item.reorderPoint}</td><td className="py-3 pr-4">${item.unitCost.toFixed(2)}</td>
-      <td className="py-3"><div className="flex gap-2"><button type="button" onClick={onMovement} title="Record stock movement" aria-label={`Record movement for ${item.sku}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-background"><ArrowDownToLine className="h-4 w-4" /></button><button type="button" onClick={onEdit} title="Edit item" aria-label={`Edit ${item.sku}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-background"><Pencil className="h-4 w-4" /></button></div></td>
+      <td className="py-3"><div className="flex gap-2"><button type="button" onClick={onMovement} title="Record stock movement" aria-label={`Record movement for ${item.sku}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-background"><ArrowDownToLine className="h-4 w-4" /></button><button type="button" onClick={onEdit} title="Edit item" aria-label={`Edit ${item.sku}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-border hover:bg-background"><Pencil className="h-4 w-4" /></button><button type="button" onClick={onDelete} title="Remove item" aria-label={`Remove ${item.sku}`} className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-danger hover:bg-danger-bg"><Trash2 className="h-4 w-4" /></button></div></td>
     </tr>
   );
 }
 
-function InventoryMobileRow({ item, isPending, onEdit, onMovement }: { item: InventoryItem; isPending: boolean; onEdit: () => void; onMovement: () => void }) {
+function InventoryMobileRow({ item, isPending, onEdit, onMovement, onDelete }: { item: InventoryItem; isPending: boolean; onEdit: () => void; onMovement: () => void; onDelete: () => void }) {
   const isLow = item.quantity <= item.reorderPoint;
   return (
     <li className="flex flex-col gap-2 py-4">
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-medium text-text-primary">{item.name}</p><p className="text-xs text-text-secondary">{item.sku} · {item.category}</p></div><span className={`shrink-0 text-sm font-semibold ${isLow ? "text-danger" : "text-text-primary"}`}>{item.quantity} {item.unit}</span></div>
       <p className="text-xs text-text-secondary">{item.locationId?.code ?? "—"} · Reorder at {item.reorderPoint} · ${item.unitCost.toFixed(2)} / unit{isPending ? " · Pending sync" : ""}</p>
-      <div className="flex gap-2"><button type="button" onClick={onMovement} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium"><ArrowDownToLine className="h-3.5 w-3.5" /> Stock movement</button><button type="button" onClick={onEdit} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button></div>
+      <div className="flex flex-wrap gap-2"><button type="button" onClick={onMovement} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium"><ArrowDownToLine className="h-3.5 w-3.5" /> Stock movement</button><button type="button" onClick={onEdit} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button><button type="button" onClick={onDelete} aria-label={`Remove ${item.sku}`} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger-bg"><Trash2 className="h-3.5 w-3.5" /> Remove</button></div>
     </li>
   );
 }

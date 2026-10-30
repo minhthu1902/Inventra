@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Search, LogOut, Menu } from "lucide-react";
 import { signOut } from "@/utils/AuthApi.js";
 import { clearCachedOfflineUser } from "@/utils/OfflineInventory";
@@ -70,13 +70,15 @@ export default function Topbar({ user, onMenuClick }: TopbarProps) {
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2 border-l border-border pl-2 sm:pl-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
-            {initials}
-          </div>
-          <div className="hidden max-w-36 leading-tight md:block">
-            <p className="truncate text-sm font-medium text-text-primary">{user.name}</p>
-            <p className="truncate text-[11px] text-text-secondary">{user.email}</p>
-          </div>
+          <Link to="/settings" title="Account settings" aria-label="Account settings" className="flex items-center gap-2 rounded-lg hover:opacity-90">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
+              {initials}
+            </span>
+            <span className="hidden max-w-36 leading-tight md:block">
+              <span className="block truncate text-sm font-medium text-text-primary">{user.name}</span>
+              <span className="block truncate text-[11px] text-text-secondary">{user.email}</span>
+            </span>
+          </Link>
           <button
             type="button"
             onClick={handleSignOut}

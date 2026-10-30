@@ -257,3 +257,108 @@ export async function getWarehouseUtilization(request, response) {
   });
   return response.status(200).json({ utilization });
 }
+
+export async function getInventoryReport(request, response) {
+  const ownerId = new mongoose.Types.ObjectId(request.auth.userId);
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const valueOf = { $multiply: ["$quantity", "$unitCost"] };
+  const [totals, byWarehouse, byCategory, movements, warehouses] = await Promise.all([
+    InventoryItem.aggregate([
+      { $match: { ownerId } },
+      {
+        $group: {
+          _id: null,
+          items: { $sum: 1 },
+          units: { $sum: "$quantity" },
+          value: { $sum: valueOf },
+          lowStock: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gt: ["$quantity", 0] },
+                    { $lte: ["$quantity", "$reorderPoint"] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          outOfStock: { $sum: { $cond: [{ $eq: ["$quantity", 0] }, 1, 0] } },
+        },
+      },
+    ]),
+    InventoryItem.aggregate([
+      { $match: { ownerId } },
+      {
+        $group: {
+          _id: "$warehouseId",
+          items: { $sum: 1 },
+          units: { $sum: "$quantity" },
+          value: { $sum: valueOf },
+        },
+      },
+    ]),
+    InventoryItem.aggregate([
+      { $match: { ownerId } },
+      {
+        $group: {
+          _id: "$category",
+          items: { $sum: 1 },
+          units: { $sum: "$quantity" },
+          value: { $sum: valueOf },
+        },
+      },
+      { $sort: { value: -1 } },
+    ]),
+    Transaction.aggregate([
+      { $match: { ownerId, createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: "$type",
+          quantity: { $sum: "$quantity" },
+          transactions: { $sum: 1 },
+        },
+      },
+    ]),
+    Warehouse.find({ ownerId }).sort({ name: 1 }).lean(),
+  ]);
+
+  const warehouseTotals = new Map(byWarehouse.map((entry) => [String(entry._id), entry]));
+  const movementByType = Object.fromEntries(movements.map((entry) => [entry._id, entry]));
+  const summary = totals[0] ?? { items: 0, units: 0, value: 0, lowStock: 0, outOfStock: 0 };
+
+  return response.status(200).json({
+    generatedAt: new Date().toISOString(),
+    totals: {
+      items: summary.items,
+      units: summary.units,
+      value: summary.value,
+      lowStock: summary.lowStock,
+      outOfStock: summary.outOfStock,
+    },
+    warehouses: warehouses.map((warehouse) => {
+      const entry = warehouseTotals.get(String(warehouse._id));
+      return {
+        id: String(warehouse._id),
+        name: warehouse.name,
+        code: warehouse.code,
+        items: entry?.items ?? 0,
+        units: entry?.units ?? 0,
+        value: entry?.value ?? 0,
+      };
+    }),
+    categories: byCategory.map((entry) => ({
+      category: entry._id || "Uncategorized",
+      items: entry.items,
+      units: entry.units,
+      value: entry.value,
+    })),
+    movementsLast30Days: ["inbound", "outbound", "transfer", "adjustment"].map((type) => ({
+      type,
+      quantity: movementByType[type]?.quantity ?? 0,
+      transactions: movementByType[type]?.transactions ?? 0,
+    })),
+  });
+}

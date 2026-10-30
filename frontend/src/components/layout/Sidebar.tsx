@@ -11,6 +11,7 @@ import {
   Warehouse,
   BarChart3,
   Settings,
+  FileClock,
 } from "lucide-react";
 import Logo from "@/components/shared/Logo";
 
@@ -18,7 +19,6 @@ type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  isAvailable?: boolean;
 };
 
 type NavSection = {
@@ -28,15 +28,16 @@ type NavSection = {
 
 const navSections: NavSection[] = [
   {
-    items: [{ label: "Dashboard", href: "/", icon: LayoutDashboard, isAvailable: true }],
+    items: [{ label: "Dashboard", href: "/", icon: LayoutDashboard }],
   },
   {
     title: "Inventory",
     items: [
-      { label: "Inventory", href: "/inventory", icon: PackageSearch, isAvailable: true },
+      { label: "Inventory", href: "/inventory", icon: PackageSearch },
       { label: "Inbound", href: "/inbound", icon: ArrowDownToLine },
       { label: "Outbound", href: "/outbound", icon: ArrowUpFromLine },
       { label: "Transfers", href: "/transfers", icon: Repeat },
+      { label: "History", href: "/transactions", icon: FileClock },
     ],
   },
   {
@@ -119,9 +120,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </ul>
             </div>
           ))}
-          <p className="px-3 text-[11px] leading-4 text-white/45">
-            Sections marked &quot;Soon&quot; will be available in a future version.
-          </p>
         </nav>
 
         <div className="m-3 rounded-xl bg-white/5 p-3">
@@ -140,24 +138,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
 function NavEntry({ item, isActive, onNavigate }: { item: NavItem; isActive: boolean; onNavigate: () => void }) {
   const Icon = item.icon;
-
-  if (!item.isAvailable) {
-    return (
-      <span
-        aria-disabled="true"
-        title="Available in a future version"
-        className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-white/40"
-      >
-        <span className="flex items-center gap-3">
-          <Icon className="h-4 w-4" />
-          {item.label}
-        </span>
-        <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white/55">
-          Soon
-        </span>
-      </span>
-    );
-  }
 
   return (
     <Link

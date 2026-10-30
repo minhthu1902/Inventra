@@ -9,6 +9,7 @@ export type StatCard = {
   changeTone: "positive" | "negative" | "neutral";
   icon: "box" | "trendingDown" | "inbound" | "outbound";
   iconTone: "blue" | "green" | "purple" | "amber";
+  href?: string;
 };
 
 export const statCards: StatCard[] = [
@@ -216,9 +217,9 @@ export type QuickAction = {
 };
 
 export const quickActions: QuickAction[] = [
-  { id: "receive", label: "Receive Stock", description: "Pick an item, record inbound", icon: "receive", tone: "green", href: "/inventory" },
-  { id: "shipment", label: "Create Shipment", description: "Pick an item, record outbound", icon: "shipment", tone: "blue", href: "/inventory" },
-  { id: "transfer", label: "Transfer Stock", description: "Pick an item, move it", icon: "transfer", tone: "purple", href: "/inventory" },
+  { id: "receive", label: "Receive Stock", description: "Pick an item, record inbound", icon: "receive", tone: "green", href: "/inventory?movement=inbound" },
+  { id: "shipment", label: "Create Shipment", description: "Pick an item, record outbound", icon: "shipment", tone: "blue", href: "/inventory?movement=outbound" },
+  { id: "transfer", label: "Transfer Stock", description: "Pick an item, move it", icon: "transfer", tone: "purple", href: "/inventory?movement=transfer" },
   { id: "add-item", label: "Add Item", description: "New inventory item", icon: "addItem", tone: "amber", href: "/inventory#add-item" },
 ];
 
@@ -234,17 +235,27 @@ export type WorkflowStep = {
   label: string;
   description: string;
   icon: "purchaseOrder" | "receiving" | "putAway" | "salesOrder" | "shipping";
-  count: number;
+  count?: number;
   tone: "blue" | "green" | "purple" | "indigo" | "teal";
+  href: string;
 };
 
-export const workflowSteps: WorkflowStep[] = [
-  { id: "po", label: "Purchase Order", description: "Create PO & confirm", icon: "purchaseOrder", count: 4, tone: "blue" },
-  { id: "receiving", label: "Receiving", description: "Inspect & verify", icon: "receiving", count: 3, tone: "green" },
-  { id: "putaway", label: "Put Away", description: "Assign location", icon: "putAway", count: 6, tone: "purple" },
-  { id: "salesorder", label: "Sales Order", description: "Pick & pack", icon: "salesOrder", count: 8, tone: "indigo" },
-  { id: "shipping", label: "Shipping", description: "Create shipment", icon: "shipping", count: 5, tone: "teal" },
-];
+// Real warehouse flow built from live dashboard numbers; each step opens the screen that performs it
+export function buildWorkflowSteps(summary: {
+  lowStockItems: number;
+  outOfStockItems: number;
+  totalSkus: number;
+  inboundToday: { transactions: number };
+  outboundToday: { transactions: number };
+} | null, warehouseCount: number): WorkflowStep[] {
+  return [
+    { id: "reorder", label: "Reorder", description: "Items at reorder point", icon: "purchaseOrder", count: summary ? summary.lowStockItems + summary.outOfStockItems : undefined, tone: "blue", href: "/inventory?stockStatus=low" },
+    { id: "receiving", label: "Receiving", description: "Record inbound stock", icon: "receiving", count: summary?.inboundToday.transactions, tone: "green", href: "/inventory?movement=inbound" },
+    { id: "putaway", label: "Put Away", description: "Warehouses & locations", icon: "putAway", count: warehouseCount, tone: "purple", href: "/locations" },
+    { id: "stock", label: "Stock on Hand", description: "Search & adjust items", icon: "salesOrder", count: summary?.totalSkus, tone: "indigo", href: "/inventory" },
+    { id: "shipping", label: "Shipping", description: "Record outbound stock", icon: "shipping", count: summary?.outboundToday.transactions, tone: "teal", href: "/inventory?movement=outbound" },
+  ];
+}
 
 export const aiInsights = [
   {

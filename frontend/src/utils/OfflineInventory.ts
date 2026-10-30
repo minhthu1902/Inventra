@@ -148,6 +148,15 @@ export async function readOfflineSnapshot<T>(ownerId: string, key: string) {
   return snapshot?.value ?? null;
 }
 
+export async function countOfflineSnapshots(ownerId: string) {
+  return storeRequest<number>("snapshots", "readonly", (store) => store.count(IDBKeyRange.bound(`${ownerId}:`, `${ownerId}:￿`)));
+}
+
+// Removes cached read-only data; queued movements are kept so nothing unsynced is lost
+export async function clearOfflineSnapshots(ownerId: string) {
+  await storeRequest("snapshots", "readwrite", (store) => store.delete(IDBKeyRange.bound(`${ownerId}:`, `${ownerId}:￿`)));
+}
+
 export async function listQueuedMovements(ownerId: string) {
   return storeRequest<QueuedMovement[]>("operations", "readonly", (store) => store.index("ownerId").getAll(ownerId));
 }
