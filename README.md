@@ -54,8 +54,10 @@ Run the backend tests with `npm test` in `backend/`.
 
 All demo records are synthetic and labeled `synthetic-demo`; they belong only to the account they are added to.
 
-- **In the app:** on an account with no inventory, choose **Load synthetic demo data** in the AI Investigator panel (`POST /api/ai/demo-data`). It adds 1 warehouse, 1 location, 2 items, and 5 transactions, including an unusual stock drop for the Investigator to find.
-- **From the command line:** after signing up and verifying an account, run `SEED_USER_EMAIL=you@example.com npm run seed:inventory` in `backend/`. It adds 2 warehouses, 3 locations, 12 grocery items (some below their reorder points), and 30 days of transactions. Running it again replaces the earlier seeded items and transactions for that account.
+Both options add the same dataset: 2 warehouses, 3 locations, 12 grocery items, and about 30 days of transactions. It includes two items below their reorder points, a burst of outbound shipments in the last day, and an unusually large shipment for the AI Investigator to find.
+
+- **In the app:** on an account with no inventory, choose **Load synthetic demo data** in the AI Investigator panel (`POST /api/ai/demo-data`).
+- **From the command line:** after signing up and verifying an account, run `SEED_USER_EMAIL=you@example.com npm run seed:inventory` in `backend/`. Running it again replaces the earlier synthetic items and transactions for that account.
 
 ## API Reference
 

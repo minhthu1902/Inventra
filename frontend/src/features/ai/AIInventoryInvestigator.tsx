@@ -96,7 +96,7 @@ export default function AIInventoryInvestigator() {
 
         {report?.analyzedItems === 0 && isOnline && (
           <div className="rounded-lg border border-white/10 bg-white/10 p-3">
-            <p className="text-xs leading-relaxed text-white/80">This account has no inventory yet. Load a small, clearly labeled synthetic dataset to try the Investigator.</p>
+            <p className="text-xs leading-relaxed text-white/80">This account has no inventory yet. Load a clearly labeled synthetic dataset (12 grocery items in 2 warehouses, with 30 days of history) to try Inventra and the Investigator.</p>
             <button
               type="button"
               onClick={() => void handleLoadDemoData()}
