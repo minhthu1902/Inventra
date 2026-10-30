@@ -156,17 +156,17 @@ function makeLocalAnswer(question, findings, transactionCount) {
 
 async function askModel(question, items, transactions, findings) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 25000);
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(aiConfig.url, {
       method: "POST",
       signal: controller.signal,
       headers: {
-        Authorization: `Bearer ${aiConfig.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${aiConfig.apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: aiConfig.OPENAI_MODEL,
+        model: aiConfig.model,
         temperature: 0.2,
         messages: [
           {
@@ -200,7 +200,7 @@ async function askModel(question, items, transactions, findings) {
         ],
       }),
     });
-    if (!response.ok) throw new Error(`AI provider returned ${response.status}`);
+    if (!response.ok) throw new Error(`${aiConfig.label} returned ${response.status}`);
     const result = await response.json();
     const content = result?.choices?.[0]?.message?.content;
     return typeof content === "string" ? content.trim() : "";
@@ -244,15 +244,15 @@ export async function askInventoryInvestigator(request, response) {
   let answer = makeLocalAnswer(parsed.data.question, findings, transactions.length);
   let generatedBy = "Local analysis";
 
-  if (aiConfig.OPENAI_API_KEY) {
+  if (aiConfig.apiKey) {
     try {
       const modelAnswer = await askModel(parsed.data.question, items, transactions, findings);
       if (modelAnswer) {
         answer = modelAnswer;
-        generatedBy = "OpenAI";
+        generatedBy = aiConfig.label;
       }
     } catch (error) {
-      console.warn("OpenAI request failed; using local analysis:", error.message);
+      console.warn(`${aiConfig.label} request failed; using local analysis:`, error.message);
       generatedBy = "Local analysis (AI service unavailable)";
     }
   }
