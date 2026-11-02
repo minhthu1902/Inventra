@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { MAX_CAPACITY_UNITS } from "../inventory/inventorySchemas.js";
 
 const warehouseSchema = new mongoose.Schema(
   {
@@ -17,7 +18,7 @@ const warehouseSchema = new mongoose.Schema(
       maxlength: 32,
     },
     address: { type: String, trim: true, maxlength: 240, default: "" },
-    capacityUnits: { type: Number, min: 0, default: 0 },
+    capacityUnits: { type: Number, min: 0, max: MAX_CAPACITY_UNITS, default: 0 },
     dataSource: { type: String, default: "user-entered" },
   },
   { timestamps: true, versionKey: false },

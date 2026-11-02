@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { isDatabaseUnavailableError } from "../db/connect.js";
 
 export function notFoundHandler(_request, response) {
@@ -9,6 +10,16 @@ export function errorHandler(error, _request, response, _next) {
     return response
       .status(409)
       .json({ message: "A record with this identifier already exists" });
+  }
+  // Data the model rejects is a bad request, not a server failure
+  if (error instanceof mongoose.Error.ValidationError) {
+    return response.status(400).json({
+      message: "Request validation failed",
+      errors: Object.values(error.errors).map(({ path, message }) => ({ path, message })),
+    });
+  }
+  if (error instanceof mongoose.Error.CastError) {
+    return response.status(400).json({ message: `Invalid value for ${error.path}` });
   }
   if (isDatabaseUnavailableError(error)) {
     console.error("Database unavailable:", error.message);

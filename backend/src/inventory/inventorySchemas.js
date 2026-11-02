@@ -1,21 +1,33 @@
 import { z } from "zod";
 
+// Stock is counted in whole units (each, carton, bag...), with upper bounds so a
+// typo or a crafted request cannot push totals into meaningless values
+export const MAX_MOVEMENT_QUANTITY = 1_000_000;
+export const MAX_ITEM_STOCK = 10_000_000;
+export const MAX_CAPACITY_UNITS = 100_000_000;
+export const MAX_UNIT_COST = 1_000_000;
+
 const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Must be a valid id");
-const positiveQuantitySchema = z.number().finite().positive();
-const nonNegativeNumberSchema = z.number().finite().min(0);
+const positiveQuantitySchema = z
+  .number()
+  .int("Quantity must be a whole number")
+  .positive()
+  .max(MAX_MOVEMENT_QUANTITY);
+const unitCountSchema = (max) => z.number().int("Must be a whole number").min(0).max(max);
+const unitCostSchema = z.number().finite().min(0).max(MAX_UNIT_COST);
 
 export const createWarehouseSchema = z.object({
   name: z.string().trim().min(1).max(120),
   code: z.string().trim().min(1).max(32),
   address: z.string().trim().max(240).optional().default(""),
-  capacityUnits: nonNegativeNumberSchema.optional().default(0),
+  capacityUnits: unitCountSchema(MAX_CAPACITY_UNITS).optional().default(0),
 });
 
 export const createLocationSchema = z.object({
   warehouseId: objectIdSchema,
   code: z.string().trim().min(1).max(40),
   zone: z.string().trim().max(80).optional().default(""),
-  capacityUnits: nonNegativeNumberSchema.optional().default(0),
+  capacityUnits: unitCountSchema(MAX_CAPACITY_UNITS).optional().default(0),
 });
 
 export const createInventoryItemSchema = z.object({
@@ -26,9 +38,9 @@ export const createInventoryItemSchema = z.object({
   name: z.string().trim().min(1).max(160),
   category: z.string().trim().max(80).optional().default("General"),
   unit: z.string().trim().max(24).optional().default("each"),
-  quantity: nonNegativeNumberSchema.optional().default(0),
-  reorderPoint: nonNegativeNumberSchema.optional().default(0),
-  unitCost: nonNegativeNumberSchema.optional().default(0),
+  quantity: unitCountSchema(MAX_MOVEMENT_QUANTITY).optional().default(0),
+  reorderPoint: unitCountSchema(MAX_MOVEMENT_QUANTITY).optional().default(0),
+  unitCost: unitCostSchema.optional().default(0),
   isPerishable: z.boolean().optional().default(false),
   expiryDate: z.iso.datetime().optional().nullable().default(null),
   batchNumber: z.string().trim().max(80).optional().default(""),

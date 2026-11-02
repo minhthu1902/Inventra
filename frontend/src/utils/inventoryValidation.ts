@@ -9,9 +9,16 @@ function text(errors: FieldErrors, field: string, value: string, label: string, 
   else if (trimmed.length > max) errors[field] = `${label} must be ${max} characters or fewer.`;
 }
 
-function nonNegative(errors: FieldErrors, field: string, value: number, label: string, { decimals }: { decimals?: number } = {}) {
+// Keep in sync with backend/src/inventory/inventorySchemas.js
+export const MAX_MOVEMENT_QUANTITY = 1_000_000;
+export const MAX_CAPACITY_UNITS = 100_000_000;
+export const MAX_UNIT_COST = 1_000_000;
+
+function nonNegative(errors: FieldErrors, field: string, value: number, label: string, { decimals, max }: { decimals?: number; max: number }) {
   if (!Number.isFinite(value)) errors[field] = `${label} must be a number.`;
   else if (value < 0) errors[field] = `${label} cannot be negative.`;
+  else if (value > max) errors[field] = `${label} cannot be more than ${max.toLocaleString("en-US")}.`;
+  else if (decimals === 0 && !Number.isInteger(value)) errors[field] = `${label} must be a whole number.`;
   else if (decimals !== undefined && Math.abs(Math.round(value * 10 ** decimals) - value * 10 ** decimals) > 1e-6) {
     errors[field] = `${label} can have at most ${decimals} decimal places.`;
   }
@@ -46,9 +53,9 @@ export function validateItemDraft(draft: {
   text(errors, "name", draft.name, "Product name", { required: true, max: 160 });
   text(errors, "category", draft.category, "Category", { max: 80 });
   text(errors, "unit", draft.unit, "Unit", { required: true, max: 24 });
-  nonNegative(errors, "quantity", draft.quantity, "Opening quantity");
-  nonNegative(errors, "reorderPoint", draft.reorderPoint, "Reorder point");
-  nonNegative(errors, "unitCost", draft.unitCost, "Unit cost", { decimals: 2 });
+  nonNegative(errors, "quantity", draft.quantity, "Opening quantity", { decimals: 0, max: MAX_MOVEMENT_QUANTITY });
+  nonNegative(errors, "reorderPoint", draft.reorderPoint, "Reorder point", { decimals: 0, max: MAX_MOVEMENT_QUANTITY });
+  nonNegative(errors, "unitCost", draft.unitCost, "Unit cost", { decimals: 2, max: MAX_UNIT_COST });
   expiry(errors, draft.isPerishable, draft.expiryDate);
   text(errors, "batchNumber", draft.batchNumber, "Batch number", { max: 80 });
   if (!draft.warehouseId) errors.warehouseId = "Choose a warehouse.";
@@ -68,8 +75,8 @@ export function validateItemUpdate(update: {
   }
   text(errors, "category", update.category, "Category", { max: 80 });
   text(errors, "unit", update.unit, "Unit", { required: true, max: 24 });
-  nonNegative(errors, "reorderPoint", update.reorderPoint, "Reorder point");
-  nonNegative(errors, "unitCost", update.unitCost, "Unit cost", { decimals: 2 });
+  nonNegative(errors, "reorderPoint", update.reorderPoint, "Reorder point", { decimals: 0, max: MAX_MOVEMENT_QUANTITY });
+  nonNegative(errors, "unitCost", update.unitCost, "Unit cost", { decimals: 2, max: MAX_UNIT_COST });
   // Existing items may already be past expiry; only require a valid date when editing
   expiry(errors, update.isPerishable, update.expiryDate, { allowPast: true });
   text(errors, "batchNumber", update.batchNumber, "Batch number", { max: 80 });
@@ -90,6 +97,10 @@ export function validateMovement(movement: {
   const reducesStock = movement.type === "outbound" || movement.type === "transfer" || (movement.type === "adjustment" && movement.direction === "decrease");
   if (!Number.isFinite(movement.quantity) || movement.quantity <= 0) {
     errors.quantity = "Quantity must be greater than zero.";
+  } else if (!Number.isInteger(movement.quantity)) {
+    errors.quantity = "Quantity must be a whole number.";
+  } else if (movement.quantity > MAX_MOVEMENT_QUANTITY) {
+    errors.quantity = `Quantity cannot be more than ${MAX_MOVEMENT_QUANTITY.toLocaleString("en-US")}.`;
   } else if (reducesStock && movement.quantity > movement.currentStock) {
     errors.quantity = `Only ${movement.currentStock} available to remove.`;
   }
@@ -110,7 +121,7 @@ export function validateWarehouse(warehouse: { name: string; code: string; addre
     errors.code = "Use letters, numbers, dots, dashes or underscores (no spaces).";
   }
   text(errors, "address", warehouse.address, "Address", { max: 240 });
-  nonNegative(errors, "capacityUnits", warehouse.capacityUnits, "Capacity");
+  nonNegative(errors, "capacityUnits", warehouse.capacityUnits, "Capacity", { decimals: 0, max: MAX_CAPACITY_UNITS });
   return errors;
 }
 
@@ -122,7 +133,7 @@ export function validateLocation(location: { warehouseId: string; code: string; 
     errors.code = "Use letters, numbers, dots, dashes or underscores (no spaces).";
   }
   text(errors, "zone", location.zone, "Zone", { max: 80 });
-  nonNegative(errors, "capacityUnits", location.capacityUnits, "Capacity");
+  nonNegative(errors, "capacityUnits", location.capacityUnits, "Capacity", { decimals: 0, max: MAX_CAPACITY_UNITS });
   return errors;
 }
 

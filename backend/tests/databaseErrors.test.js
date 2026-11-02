@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import mongoose from "mongoose";
 import { isDatabaseUnavailableError } from "../src/db/connect.js";
 import { errorHandler } from "../src/middleware/errorHandler.js";
 
@@ -40,4 +41,13 @@ test("error handler answers 503 instead of 500 when the database is unreachable"
   }
   assert.equal(response.statusCode, 503);
   assert.match(response.body.message, /temporarily unavailable/);
+});
+
+test("model validation errors become 400 responses instead of 500", () => {
+  const error = new mongoose.Error.ValidationError();
+  error.addError("quantity", new mongoose.Error.ValidatorError({ path: "quantity", message: "Quantity is too large" }));
+  const response = createResponseStub();
+  errorHandler(error, {}, response, () => {});
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.body.errors, [{ path: "quantity", message: "Quantity is too large" }]);
 });

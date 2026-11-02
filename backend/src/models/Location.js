@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { MAX_CAPACITY_UNITS } from "../inventory/inventorySchemas.js";
 
 const locationSchema = new mongoose.Schema(
   {
@@ -22,7 +23,7 @@ const locationSchema = new mongoose.Schema(
       maxlength: 40,
     },
     zone: { type: String, trim: true, maxlength: 80, default: "" },
-    capacityUnits: { type: Number, min: 0, default: 0 },
+    capacityUnits: { type: Number, min: 0, max: MAX_CAPACITY_UNITS, default: 0 },
     dataSource: { type: String, default: "user-entered" },
   },
   { timestamps: true, versionKey: false },

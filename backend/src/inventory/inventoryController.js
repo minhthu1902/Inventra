@@ -4,6 +4,7 @@ import { Location } from "../models/Location.js";
 import { Transaction } from "../models/Transaction.js";
 import { Warehouse } from "../models/Warehouse.js";
 import {
+  MAX_ITEM_STOCK,
   calculateStockMovement,
   createInventoryItemSchema,
   createLocationSchema,
@@ -31,6 +32,29 @@ function escapeRegex(value) {
 
 function invalidReference(response, message) {
   return response.status(400).json({ message });
+}
+
+// Returns a message when adding units would exceed the warehouse capacity (0 means no limit set)
+async function warehouseCapacityProblem(ownerId, warehouseId, addedUnits) {
+  const warehouse = await Warehouse.findOne({ _id: warehouseId, ownerId }).lean();
+  if (!warehouse?.capacityUnits) return null;
+  const [usage] = await InventoryItem.aggregate([
+    {
+      $match: {
+        ownerId: new mongoose.Types.ObjectId(String(ownerId)),
+        warehouseId: new mongoose.Types.ObjectId(String(warehouseId)),
+      },
+    },
+    { $group: { _id: null, usedUnits: { $sum: "$quantity" } } },
+  ]);
+  const usedUnits = usage?.usedUnits ?? 0;
+  if (usedUnits + addedUnits <= warehouse.capacityUnits) return null;
+  const available = Math.max(0, warehouse.capacityUnits - usedUnits);
+  return `${warehouse.name} has room for ${available} more units (capacity ${warehouse.capacityUnits}).`;
+}
+
+function stockLimitMessage() {
+  return `An item cannot hold more than ${MAX_ITEM_STOCK.toLocaleString("en-US")} units.`;
 }
 
 export async function listWarehouses(request, response) {
@@ -172,6 +196,10 @@ export async function createInventoryItem(request, response) {
       "Warehouse or location is not available to this user",
     );
   }
+  if (parsed.data.quantity > 0) {
+    const capacityProblem = await warehouseCapacityProblem(ownerId, parsed.data.warehouseId, parsed.data.quantity);
+    if (capacityProblem) return response.status(409).json({ message: capacityProblem });
+  }
 
   const item = await InventoryItem.create({
     ...parsed.data,
@@ -299,6 +327,14 @@ export async function createStockMovement(request, response) {
   const sign = movementDirection === "increase" ? 1 : -1;
   const filter = { _id: request.params.itemId, ownerId };
   if (sign < 0) filter.quantity = { $gte: quantity };
+  else {
+    filter.quantity = { $lte: MAX_ITEM_STOCK - quantity };
+    const target = await InventoryItem.findOne({ _id: request.params.itemId, ownerId }).lean();
+    if (!target)
+      return response.status(404).json({ message: "Inventory item not found" });
+    const capacityProblem = await warehouseCapacityProblem(ownerId, target.warehouseId, quantity);
+    if (capacityProblem) return response.status(409).json({ message: capacityProblem });
+  }
 
   const item = await InventoryItem.findOneAndUpdate(
     filter,
@@ -314,7 +350,7 @@ export async function createStockMovement(request, response) {
       return response.status(404).json({ message: "Inventory item not found" });
     return response
       .status(409)
-      .json({ message: "Insufficient stock for this outbound movement" });
+      .json({ message: sign < 0 ? "Insufficient stock for this outbound movement" : stockLimitMessage() });
   }
 
   const movement = calculateStockMovement(
@@ -414,6 +450,11 @@ export async function transferInventory(request, response) {
       await InventoryItem.updateOne(sourceFilter, { $inc: { quantity } });
       return response.status(400).json({ message: "Choose another warehouse for a transfer." });
     }
+    const capacityProblem = await warehouseCapacityProblem(ownerId, destinationWarehouseId, quantity);
+    if (capacityProblem) {
+      await InventoryItem.updateOne(sourceFilter, { $inc: { quantity } });
+      return response.status(409).json({ message: capacityProblem });
+    }
 
     destinationItem = await InventoryItem.findOne({ ownerId, warehouseId: destinationWarehouseId, sku: source.sku });
     if (destinationItem) {
@@ -422,10 +463,14 @@ export async function transferInventory(request, response) {
         return response.status(409).json({ message: "This SKU already uses another location in the destination warehouse. Choose that location." });
       }
       destinationItem = await InventoryItem.findOneAndUpdate(
-        { _id: destinationItem._id, ownerId },
+        { _id: destinationItem._id, ownerId, quantity: { $lte: MAX_ITEM_STOCK - quantity } },
         { $inc: { quantity } },
         { new: true, runValidators: true },
       );
+      if (!destinationItem) {
+        await InventoryItem.updateOne(sourceFilter, { $inc: { quantity } });
+        return response.status(409).json({ message: stockLimitMessage() });
+      }
       destinationAdded = true;
     } else {
       try {
@@ -457,10 +502,15 @@ export async function transferInventory(request, response) {
           throw conflict;
         }
         destinationItem = await InventoryItem.findOneAndUpdate(
-          { _id: racedDestination._id, ownerId },
+          { _id: racedDestination._id, ownerId, quantity: { $lte: MAX_ITEM_STOCK - quantity } },
           { $inc: { quantity } },
           { new: true, runValidators: true },
         );
+        if (!destinationItem) {
+          const limitReached = new Error(stockLimitMessage());
+          limitReached.status = 409;
+          throw limitReached;
+        }
         destinationAdded = true;
       }
     }

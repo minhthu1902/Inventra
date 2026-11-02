@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { MAX_ITEM_STOCK } from "../inventory/inventorySchemas.js";
 
 const transactionSchema = new mongoose.Schema(
   {
@@ -49,7 +50,7 @@ const transactionSchema = new mongoose.Schema(
       enum: ["increase", "decrease"],
       default: null,
     },
-    quantity: { type: Number, required: true, min: 1 },
+    quantity: { type: Number, required: true, min: 1, max: MAX_ITEM_STOCK },
     stockBefore: { type: Number, required: true, min: 0 },
     stockAfter: { type: Number, required: true, min: 0 },
     reference: { type: String, trim: true, maxlength: 80, default: "" },

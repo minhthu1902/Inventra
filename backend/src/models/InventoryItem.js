@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { MAX_ITEM_STOCK } from "../inventory/inventorySchemas.js";
 
 const inventoryItemSchema = new mongoose.Schema(
   {
@@ -31,7 +32,7 @@ const inventoryItemSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 160 },
     category: { type: String, trim: true, maxlength: 80, default: "General" },
     unit: { type: String, trim: true, maxlength: 24, default: "each" },
-    quantity: { type: Number, required: true, min: 0, default: 0 },
+    quantity: { type: Number, required: true, min: 0, max: MAX_ITEM_STOCK, default: 0 },
     reorderPoint: { type: Number, min: 0, default: 0 },
     unitCost: { type: Number, min: 0, default: 0 },
     isPerishable: { type: Boolean, default: false },

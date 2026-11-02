@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MAX_MOVEMENT_QUANTITY,
   calculateStockMovement,
   createInventoryItemSchema,
+  createWarehouseSchema,
   inventoryQuerySchema,
   inventoryTransferSchema,
   stockMovementSchema,
@@ -97,4 +99,26 @@ test("offline transfers require owned destination references and a stable operat
     clientOperationId: "not-a-uuid",
   }).success, false);
   assert.equal(transactionQuerySchema.safeParse({ type: "transfer" }).success, true);
+});
+
+test("stock quantities are whole numbers with an upper limit", () => {
+  assert.equal(stockMovementSchema.safeParse({ type: "inbound", quantity: 0.5 }).success, false);
+  assert.equal(stockMovementSchema.safeParse({ type: "inbound", quantity: 1e308 }).success, false);
+  assert.equal(stockMovementSchema.safeParse({ type: "inbound", quantity: MAX_MOVEMENT_QUANTITY }).success, true);
+  assert.equal(stockMovementSchema.safeParse({ type: "inbound", quantity: MAX_MOVEMENT_QUANTITY + 1 }).success, false);
+  assert.equal(inventoryTransferSchema.safeParse({
+    destinationWarehouseId: "64b000000000000000000001",
+    destinationLocationId: "64b000000000000000000002",
+    quantity: 2.5,
+  }).success, false);
+  const item = {
+    warehouseId: "64b000000000000000000001",
+    locationId: "64b000000000000000000002",
+    sku: "MILK-001",
+    name: "Whole Milk",
+  };
+  assert.equal(createInventoryItemSchema.safeParse({ ...item, quantity: 1.5 }).success, false);
+  assert.equal(createInventoryItemSchema.safeParse({ ...item, quantity: 1e12 }).success, false);
+  assert.equal(createInventoryItemSchema.safeParse({ ...item, unitCost: 3.49 }).success, true);
+  assert.equal(createWarehouseSchema.safeParse({ name: "North", code: "N", capacityUnits: 1e12 }).success, false);
 });
