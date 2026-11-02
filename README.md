@@ -1,5 +1,7 @@
 # Inventra
 
+**Live app: [https://136.80.5.76](https://136.80.5.76/)** · API health: [https://136.80.5.76/api/health](https://136.80.5.76/api/health)
+
 Inventra is a web-based inventory management project for warehouse teams. It provides an inventory dashboard and tools for tracking stock and warehouse transactions, with an AI Inventory Investigator to help explain notable inventory patterns.
 
 The included inventory seed is synthetic demo data. It is not real retailer operational data.
@@ -95,6 +97,7 @@ All endpoints are under `/api`. Except for health and the sign-up/sign-in flow, 
 
 - **Items:** add, edit, and remove items. Forms validate SKUs, codes, quantities, prices (up to 2 decimals), and expiry dates before anything is sent. Removing an item that still has stock writes the remaining units off with an `ITEM-REMOVED` adjustment, so totals and history stay accurate.
 - **Stock movements:** receive, ship, transfer between warehouses, and adjust counts. Dashboard Quick Actions open the inventory with the chosen movement preselected.
+- **Limits:** stock is counted in whole units, up to 1,000,000 per movement and 10,000,000 per item. Receiving, adding items, and transfers are refused when the warehouse would exceed its capacity (a capacity of 0 means no limit).
 - **History:** Inbound, Outbound, Transfers, Adjustments, and an all-movements view, each paginated.
 - **Warehouses and locations:** create warehouses with capacity, see how full each one is, and add storage locations to them.
 - **Reports:** inventory value by warehouse and category, the last 30 days of movement, and a CSV export of every item.
